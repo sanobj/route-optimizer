@@ -704,7 +704,14 @@
         // Start
         stepsHtml += `
             <div class="route-step">
-                <span class="marker">🟢</span>
+                <div class="step-timeline">
+                    <span class="timeline-dot dot-start">🟢</span>
+                    <span class="timeline-connector">
+                        <span class="connector-line"></span>
+                        <span class="connector-info">${legs[0].distance.text}<br>${legs[0].duration.text}</span>
+                        <span class="connector-line"></span>
+                    </span>
+                </div>
                 <div class="step-info">
                     <div class="step-address">${legs[0].start_address}</div>
                     <div class="step-detail">Start</div>
@@ -715,12 +722,24 @@
         // Intermediate stops in optimized order
         legs.forEach((leg, i) => {
             const isLast = i === legs.length - 1;
+            const dotClass = isLast ? 'dot-end' : 'dot-stop';
+            const dotContent = isLast ? '🔴' : `<span class="stop-number">${i + 1}</span>`;
+
             stepsHtml += `
                 <div class="route-step">
-                    <span class="${isLast ? 'marker' : 'stop-number'}">${isLast ? '🔴' : i + 1}</span>
+                    <div class="step-timeline">
+                        <span class="timeline-dot ${dotClass}">${dotContent}</span>
+                        ${!isLast ? `
+                        <span class="timeline-connector">
+                            <span class="connector-line"></span>
+                            <span class="connector-info">${legs[i + 1] ? legs[i + 1].distance.text : ''}<br>${legs[i + 1] ? legs[i + 1].duration.text : ''}</span>
+                            <span class="connector-line"></span>
+                        </span>
+                        ` : ''}
+                    </div>
                     <div class="step-info">
                         <div class="step-address">${leg.end_address}</div>
-                        <div class="step-detail">${leg.distance.text} · ${leg.duration.text}</div>
+                        <div class="step-detail">${isLast ? 'End' : 'Stop ' + (i + 1)}</div>
                     </div>
                 </div>
             `;
