@@ -62,7 +62,7 @@
         stopEl.dataset.id = stopId;
         stopEl.innerHTML = `
             <span class="stop-number">${index + 1}</span>
-            <input type="text" class="stop-input" placeholder="Enter destination address" autocomplete="off" data-id="${stopId}">
+            <input type="text" class="stop-input" placeholder="Enter destination address" autocomplete="new-password" data-id="${stopId}">
             <button class="remove-btn" aria-label="Remove stop" data-id="${stopId}">✕</button>
         `;
 
@@ -162,14 +162,25 @@
         if (!apiKey) return;
         if (window.google && window.google.maps) return;
 
-        const script = document.getElementById('google-maps-script');
+        // Remove old script if exists
+        const oldScript = document.getElementById('google-maps-script');
+        if (oldScript) oldScript.remove();
+
+        const script = document.createElement('script');
+        script.id = 'google-maps-script';
         script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places&callback=initMap`;
         script.async = true;
         script.defer = true;
+        script.onerror = () => {
+            alert('Failed to load Google Maps. Check your API key and that the Maps JavaScript API is enabled.');
+        };
+        document.body.appendChild(script);
     }
 
     // Google Maps initialization (called by API callback)
     window.initMap = function() {
+        console.log('Google Maps loaded successfully');
+
         map = new google.maps.Map(mapContainer, {
             center: { lat: 39.8283, lng: -98.5795 }, // Center of US
             zoom: 4,
@@ -183,18 +194,24 @@
         mapContainer.classList.add('active');
 
         // Enable Places Autocomplete on inputs
+        console.log('Enabling autocomplete on inputs...');
         enableAutocomplete(startInput);
-        document.querySelectorAll('.stop-input').forEach(enableAutocomplete);
+        document.querySelectorAll('.stop-input').forEach(input => {
+            enableAutocomplete(input);
+        });
+        console.log('Autocomplete setup complete');
     };
 
     function enableAutocomplete(input) {
         if (!window.google || !google.maps.places) return;
+
+        // Google Autocomplete requires autocomplete attribute to not be "off"
+        input.setAttribute('autocomplete', 'new-password');
+
         const autocomplete = new google.maps.places.Autocomplete(input, {
-            types: ['geocode', 'establishment'],
             fields: ['formatted_address', 'name', 'geometry'],
         });
 
-        // Fix for mobile: prevent Google's pac-container from being hidden behind elements
         autocomplete.addListener('place_changed', () => {
             const place = autocomplete.getPlace();
             if (place.formatted_address) {
