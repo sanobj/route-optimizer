@@ -45,7 +45,12 @@
             </div>
 
             <div class="end-location">
-                <div class="input-row">
+                <div class="end-mode-selector">
+                    <button class="end-mode-btn active" data-mode="none">No End</button>
+                    <button class="end-mode-btn" data-mode="round-trip">Round Trip</button>
+                    <button class="end-mode-btn" data-mode="address">End Address</button>
+                </div>
+                <div class="input-row end-input-row hidden">
                     <span class="marker end-marker">🔴</span>
                     <input type="text" id="end-input" placeholder="End location" autocomplete="new-password">
                 </div>

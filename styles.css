@@ -602,3 +602,39 @@ body {
     background: var(--warning);
     color: #000;
 }
+
+
+/* End Mode Selector */
+.end-mode-selector {
+    display: flex;
+    gap: 4px;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border);
+}
+
+.end-mode-btn {
+    flex: 1;
+    padding: 8px 4px;
+    border: 2px solid var(--border);
+    border-radius: 8px;
+    background: transparent;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.end-mode-btn.active {
+    border-color: var(--primary);
+    background: rgba(26, 115, 232, 0.08);
+    color: var(--primary);
+}
+
+.end-mode-btn:hover:not(.active) {
+    border-color: var(--text-secondary);
+}
+
+.end-input-row.hidden {
+    display: none;
+}

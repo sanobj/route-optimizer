@@ -26,6 +26,11 @@
     const cancelSettingsBtn = document.getElementById('cancel-settings-btn');
     const mapContainer = document.getElementById('map');
 
+    // End mode state: 'none', 'round-trip', 'address'
+    let endMode = 'none';
+    const endModeBtns = document.querySelectorAll('.end-mode-btn');
+    const endInputRow = document.querySelector('.end-input-row');
+
     // Last optimized route data for navigation link
     let optimizedRoute = null;
 
@@ -40,6 +45,22 @@
         navigateBtn.addEventListener('click', openInGoogleMaps);
         startInput.addEventListener('input', updateOptimizeButton);
         endInput.addEventListener('input', updateOptimizeButton);
+
+        // End mode toggle
+        endModeBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                endMode = btn.dataset.mode;
+                endModeBtns.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+
+                if (endMode === 'address') {
+                    endInputRow.classList.remove('hidden');
+                } else {
+                    endInputRow.classList.add('hidden');
+                }
+                updateOptimizeButton();
+            });
+        });
 
         // Add two empty stops by default
         addStop();
@@ -148,9 +169,12 @@
 
     function updateOptimizeButton() {
         const hasStart = startInput.value.trim().length > 0;
-        const hasEnd = endInput.value.trim().length > 0;
         const filledStops = stops.filter(s => s.address.trim().length > 0);
-        optimizeBtn.disabled = !(hasStart && hasEnd && filledStops.length >= 1);
+        let endReady = true;
+        if (endMode === 'address') {
+            endReady = endInput.value.trim().length > 0;
+        }
+        optimizeBtn.disabled = !(hasStart && endReady && filledStops.length >= 1);
     }
 
     // GPS
@@ -330,11 +354,25 @@
         }
 
         const origin = startInput.value.trim();
-        const destination = endInput.value.trim();
         const filledStops = stops.filter(s => s.address.trim().length > 0);
 
-        if (!origin || !destination || filledStops.length < 1) {
-            alert('Please enter a start, end, and at least 1 stop.');
+        // Determine destination based on end mode
+        let destination;
+        if (endMode === 'round-trip') {
+            destination = origin;
+        } else if (endMode === 'address') {
+            destination = endInput.value.trim();
+            if (!destination) {
+                alert('Please enter an end address.');
+                return;
+            }
+        } else {
+            // "none" mode — no fixed end
+            destination = null;
+        }
+
+        if (!origin || filledStops.length < 1) {
+            alert('Please enter a start and at least 1 stop.');
             return;
         }
 
@@ -345,18 +383,29 @@
 
         // Separate pinned and unpinned stops
         const pinnedStops = filledStops.filter(s => s.pinned);
-        const unpinnedStops = filledStops.filter(s => !s.pinned);
 
-        // If there are pinned stops, we need to do segmented optimization
-        // Strategy: pinned stops define fixed waypoints in order,
-        // unpinned stops are distributed between pinned segments and optimized
-        if (pinnedStops.length === 0) {
-            // Simple case: optimize all waypoints freely
-            runDirections(origin, destination, filledStops.map(s => s.address.trim()), true);
+        if (destination === null) {
+            // No end mode: use last waypoint as destination, optimize the rest
+            if (filledStops.length === 1) {
+                runDirections(origin, filledStops[0].address.trim(), [], false);
+            } else {
+                const allAddresses = filledStops.map(s => s.address.trim());
+                const dest = allAddresses[allAddresses.length - 1];
+                const waypoints = allAddresses.slice(0, -1);
+
+                if (pinnedStops.length === 0) {
+                    runDirections(origin, dest, waypoints, true);
+                } else {
+                    optimizeWithPinnedStops(origin, dest, filledStops);
+                }
+            }
         } else {
-            // Build the route with pinned stops in fixed positions
-            // and optimize unpinned stops within segments
-            optimizeWithPinnedStops(origin, destination, filledStops);
+            // Have a fixed destination (round-trip or address)
+            if (pinnedStops.length === 0) {
+                runDirections(origin, destination, filledStops.map(s => s.address.trim()), true);
+            } else {
+                optimizeWithPinnedStops(origin, destination, filledStops);
+            }
         }
     }
 
@@ -723,12 +772,12 @@
 
     function saveCurrentRoute() {
         const origin = startInput.value.trim();
-        const destination = endInput.value.trim();
+        const destination = endMode === 'address' ? endInput.value.trim() : '';
         const waypoints = stops
             .filter(s => s.address.trim().length > 0)
-            .map(s => s.address.trim());
+            .map(s => ({ address: s.address.trim(), pinned: s.pinned }));
 
-        if (!origin || !destination || waypoints.length === 0) {
+        if (!origin || waypoints.length === 0) {
             alert('Nothing to save. Enter addresses first.');
             return;
         }
@@ -741,12 +790,14 @@
             name: name.trim(),
             origin: origin,
             destination: destination,
-            stops: waypoints,
+            endMode: endMode,
+            stops: waypoints.map(s => s.address),
+            pinnedIndices: waypoints.reduce((acc, s, i) => { if (s.pinned) acc.push(i); return acc; }, []),
             createdAt: new Date().toLocaleDateString(),
         };
 
         const saved = getSavedRoutes();
-        saved.unshift(route); // Add to top
+        saved.unshift(route);
         setSavedRoutes(saved);
         renderSavedRoutes();
     }
@@ -760,9 +811,22 @@
         stopsContainer.innerHTML = '';
         stops = [];
 
-        // Set origin and destination
+        // Set origin
         startInput.value = route.origin;
-        endInput.value = route.destination || '';
+
+        // Restore end mode
+        const savedEndMode = route.endMode || (route.destination ? 'address' : 'none');
+        endMode = savedEndMode;
+        endModeBtns.forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.mode === endMode);
+        });
+        if (endMode === 'address') {
+            endInputRow.classList.remove('hidden');
+            endInput.value = route.destination || '';
+        } else {
+            endInputRow.classList.add('hidden');
+            endInput.value = '';
+        }
 
         // Add saved stops
         route.stops.forEach(address => {
