@@ -189,7 +189,7 @@
         });
         directionsRenderer = new google.maps.DirectionsRenderer({
             map: map,
-            suppressMarkers: false,
+            suppressMarkers: true,
         });
         mapContainer.classList.add('active');
 
@@ -329,15 +329,74 @@
         }
     }
 
+    // Custom map markers
+    function addCustomMarker(position, emoji, title) {
+        const marker = new google.maps.Marker({
+            position: position,
+            map: map,
+            title: title,
+            label: {
+                text: emoji,
+                fontSize: '18px',
+            },
+            icon: {
+                path: google.maps.SymbolPath.CIRCLE,
+                scale: 0,
+            },
+        });
+        window._routeMarkers.push(marker);
+    }
+
+    function addNumberedMarker(position, label, color) {
+        const svg = `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
+            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="40" viewBox="0 0 32 40">
+                <path d="M16 0C7.2 0 0 7.2 0 16c0 12 16 24 16 24s16-12 16-24C32 7.2 24.8 0 16 0z" fill="${color}"/>
+                <circle cx="16" cy="16" r="10" fill="white"/>
+                <text x="16" y="21" text-anchor="middle" font-size="12" font-weight="bold" fill="${color}">${label}</text>
+            </svg>
+        `)}`;
+
+        const marker = new google.maps.Marker({
+            position: position,
+            map: map,
+            icon: {
+                url: svg,
+                scaledSize: new google.maps.Size(32, 40),
+                anchor: new google.maps.Point(16, 40),
+            },
+        });
+        window._routeMarkers.push(marker);
+    }
+
     function displayRoute(result, origin, originalWaypoints) {
         // Show on map
         if (directionsRenderer) {
             directionsRenderer.setDirections(result);
+            // Hide default A, B, C markers — we'll add our own
+            directionsRenderer.setOptions({ suppressMarkers: true });
         }
         mapContainer.classList.add('active');
 
+        // Clear old custom markers
+        if (window._routeMarkers) {
+            window._routeMarkers.forEach(m => m.setMap(null));
+        }
+        window._routeMarkers = [];
+
         const route = result.routes[0];
         const legs = route.legs;
+
+        // Add custom numbered markers
+        // Start marker (green)
+        addCustomMarker(legs[0].start_location, '📍', 'Start');
+
+        // Intermediate stops (numbered)
+        legs.forEach((leg, i) => {
+            const isLast = i === legs.length - 1;
+            const label = isLast ? '●' : String(i + 1);
+            const color = isLast ? '#ea4335' : '#1a73e8';
+            addNumberedMarker(leg.end_location, label, color);
+        });
 
         // Calculate totals
         let totalDistance = 0;
