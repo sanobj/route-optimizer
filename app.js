@@ -441,6 +441,136 @@
         window.open(url, '_blank');
     }
 
+    // ===== SAVED ROUTES =====
+    const saveRouteBtn = document.getElementById('save-route-btn');
+    const savedRoutesList = document.getElementById('saved-routes-list');
+
+    saveRouteBtn.addEventListener('click', saveCurrentRoute);
+
+    function getSavedRoutes() {
+        const data = localStorage.getItem('savedRoutes');
+        return data ? JSON.parse(data) : [];
+    }
+
+    function setSavedRoutes(routes) {
+        localStorage.setItem('savedRoutes', JSON.stringify(routes));
+    }
+
+    function saveCurrentRoute() {
+        const origin = startInput.value.trim();
+        const waypoints = stops
+            .filter(s => s.address.trim().length > 0)
+            .map(s => s.address.trim());
+
+        if (!origin || waypoints.length === 0) {
+            alert('Nothing to save. Enter addresses first.');
+            return;
+        }
+
+        const name = prompt('Name this route:', `Route ${getSavedRoutes().length + 1}`);
+        if (!name) return; // User cancelled
+
+        const route = {
+            id: Date.now(),
+            name: name.trim(),
+            origin: origin,
+            stops: waypoints,
+            createdAt: new Date().toLocaleDateString(),
+        };
+
+        const saved = getSavedRoutes();
+        saved.unshift(route); // Add to top
+        setSavedRoutes(saved);
+        renderSavedRoutes();
+    }
+
+    function loadRoute(id) {
+        const saved = getSavedRoutes();
+        const route = saved.find(r => r.id === id);
+        if (!route) return;
+
+        // Clear current stops
+        stopsContainer.innerHTML = '';
+        stops = [];
+
+        // Set origin
+        startInput.value = route.origin;
+
+        // Add saved stops
+        route.stops.forEach(address => {
+            const index = stops.length;
+            const stopId = Date.now() + index + Math.random();
+            stops.push({ id: stopId, address: address });
+
+            const stopEl = document.createElement('div');
+            stopEl.className = 'input-row';
+            stopEl.dataset.id = stopId;
+            stopEl.innerHTML = `
+                <span class="stop-number">${index + 1}</span>
+                <input type="text" class="stop-input" placeholder="Enter destination address" autocomplete="new-password" data-id="${stopId}" value="${address}">
+                <button class="remove-btn" aria-label="Remove stop" data-id="${stopId}">✕</button>
+            `;
+
+            stopsContainer.appendChild(stopEl);
+
+            const input = stopEl.querySelector('.stop-input');
+            const removeBtn = stopEl.querySelector('.remove-btn');
+
+            input.addEventListener('input', (e) => {
+                const stop = stops.find(s => s.id === stopId);
+                if (stop) stop.address = e.target.value;
+                updateOptimizeButton();
+            });
+
+            removeBtn.addEventListener('click', () => removeStop(stopId));
+
+            // Enable autocomplete on the new input
+            if (window.google && google.maps.places) {
+                enableAutocomplete(input);
+            }
+        });
+
+        updateOptimizeButton();
+
+        // Scroll to top
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function deleteRoute(id) {
+        if (!confirm('Delete this saved route?')) return;
+        const saved = getSavedRoutes().filter(r => r.id !== id);
+        setSavedRoutes(saved);
+        renderSavedRoutes();
+    }
+
+    function renderSavedRoutes() {
+        const saved = getSavedRoutes();
+
+        if (saved.length === 0) {
+            savedRoutesList.innerHTML = '<p class="empty-state">No saved routes yet</p>';
+            return;
+        }
+
+        savedRoutesList.innerHTML = saved.map(route => `
+            <div class="saved-route-card">
+                <div class="route-name">${route.name}</div>
+                <div class="route-stops-preview">📍 ${route.origin} → ${route.stops.length} stop${route.stops.length > 1 ? 's' : ''}</div>
+                <div class="route-meta">Saved ${route.createdAt}</div>
+                <div class="saved-route-actions">
+                    <button class="btn-load" onclick="window._loadRoute(${route.id})">Load</button>
+                    <button class="btn-delete-route" onclick="window._deleteRoute(${route.id})">Delete</button>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    // Expose to onclick handlers
+    window._loadRoute = loadRoute;
+    window._deleteRoute = deleteRoute;
+
+    // Render saved routes on load
+    renderSavedRoutes();
+
     // Register Service Worker
     if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('sw.js').catch(() => {

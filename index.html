@@ -59,7 +59,20 @@
             <h2>Optimized Route</h2>
             <div id="route-summary" class="route-summary"></div>
             <div id="route-steps" class="route-steps"></div>
-            <button id="navigate-btn" class="btn btn-navigate">Open in Google Maps</button>
+            <div class="result-actions">
+                <button id="navigate-btn" class="btn btn-navigate">Open in Google Maps</button>
+                <button id="save-route-btn" class="btn btn-save">💾 Save Route</button>
+            </div>
+        </section>
+
+        <!-- Saved Routes Section -->
+        <section id="saved-routes-section" class="saved-routes-section">
+            <div class="saved-header">
+                <h2>Saved Routes</h2>
+            </div>
+            <div id="saved-routes-list" class="saved-routes-list">
+                <p class="empty-state">No saved routes yet</p>
+            </div>
         </section>
 
         <!-- Map Section -->
