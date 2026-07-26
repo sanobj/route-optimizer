@@ -346,6 +346,52 @@
     });
     observer.observe(stopsContainer, { childList: true });
 
+    // Address validation — highlights unresolvable addresses in yellow
+    async function validateAddresses(origin, destination, filledStops) {
+        const geocoder = new google.maps.Geocoder();
+
+        // Clear all previous warnings
+        startInput.classList.remove('address-warning');
+        endInput.classList.remove('address-warning');
+        document.querySelectorAll('.stop-input').forEach(input => {
+            input.classList.remove('address-warning');
+        });
+
+        // Helper: geocode and return true if found
+        function checkAddress(address) {
+            return new Promise(resolve => {
+                geocoder.geocode({ address: address }, (results, status) => {
+                    resolve(status === google.maps.GeocoderStatus.OK);
+                });
+            });
+        }
+
+        // Check origin
+        const originOk = await checkAddress(origin);
+        if (!originOk) {
+            startInput.classList.add('address-warning');
+        }
+
+        // Check destination if applicable
+        if (destination && destination !== origin) {
+            const destOk = await checkAddress(destination);
+            if (!destOk) {
+                endInput.classList.add('address-warning');
+            }
+        }
+
+        // Check each stop
+        for (const stop of filledStops) {
+            const ok = await checkAddress(stop.address.trim());
+            if (!ok) {
+                const input = stopsContainer.querySelector(`input[data-id="${stop.id}"]`);
+                if (input) {
+                    input.classList.add('address-warning');
+                }
+            }
+        }
+    }
+
     // Route Optimization
     async function optimizeRoute() {
         if (!apiKey) {
@@ -380,6 +426,9 @@
         optimizeBtn.innerHTML = '<span class="loading"></span> Optimizing...';
         optimizeBtn.disabled = true;
         resultsSection.classList.add('hidden');
+
+        // Validate addresses (non-blocking — just highlights bad ones)
+        await validateAddresses(origin, destination, filledStops);
 
         // Separate pinned and unpinned stops
         const pinnedStops = filledStops.filter(s => s.pinned);

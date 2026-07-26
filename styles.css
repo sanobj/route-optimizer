@@ -642,3 +642,11 @@ body {
 .end-input-row.hidden {
     display: none;
 }
+
+
+/* Address validation warning */
+.address-warning {
+    background: rgba(251, 188, 4, 0.15) !important;
+    border-bottom: 2px solid var(--warning) !important;
+    border-radius: 4px;
+}
