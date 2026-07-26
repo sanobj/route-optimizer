@@ -57,14 +57,17 @@
     function addStop() {
         const index = stops.length;
         const stopId = Date.now() + index;
-        stops.push({ id: stopId, address: '' });
+        stops.push({ id: stopId, address: '', pinned: false });
 
         const stopEl = document.createElement('div');
         stopEl.className = 'input-row';
         stopEl.dataset.id = stopId;
         stopEl.innerHTML = `
+            <button class="pin-btn" aria-label="Pin this stop" data-id="${stopId}" title="Pin to keep position">🔓</button>
             <span class="stop-number">${index + 1}</span>
             <input type="text" class="stop-input" placeholder="Enter destination address" autocomplete="new-password" data-id="${stopId}">
+            <button class="move-up-btn" aria-label="Move up" data-id="${stopId}">▲</button>
+            <button class="move-down-btn" aria-label="Move down" data-id="${stopId}">▼</button>
             <button class="remove-btn" aria-label="Remove stop" data-id="${stopId}">✕</button>
         `;
 
@@ -73,6 +76,9 @@
         // Event listeners
         const input = stopEl.querySelector('.stop-input');
         const removeBtn = stopEl.querySelector('.remove-btn');
+        const pinBtn = stopEl.querySelector('.pin-btn');
+        const moveUpBtn = stopEl.querySelector('.move-up-btn');
+        const moveDownBtn = stopEl.querySelector('.move-down-btn');
 
         input.addEventListener('input', (e) => {
             const stop = stops.find(s => s.id === stopId);
@@ -81,7 +87,48 @@
         });
 
         removeBtn.addEventListener('click', () => removeStop(stopId));
+        pinBtn.addEventListener('click', () => togglePin(stopId));
+        moveUpBtn.addEventListener('click', () => moveStop(stopId, -1));
+        moveDownBtn.addEventListener('click', () => moveStop(stopId, 1));
         updateOptimizeButton();
+    }
+
+    function togglePin(id) {
+        const stop = stops.find(s => s.id === id);
+        if (!stop) return;
+        stop.pinned = !stop.pinned;
+
+        const row = stopsContainer.querySelector(`[data-id="${id}"]`);
+        const pinBtn = row.querySelector('.pin-btn');
+        if (stop.pinned) {
+            pinBtn.textContent = '📌';
+            pinBtn.title = 'Unpin to allow optimization';
+            row.classList.add('pinned');
+        } else {
+            pinBtn.textContent = '🔓';
+            pinBtn.title = 'Pin to keep position';
+            row.classList.remove('pinned');
+        }
+    }
+
+    function moveStop(id, direction) {
+        const index = stops.findIndex(s => s.id === id);
+        const newIndex = index + direction;
+        if (newIndex < 0 || newIndex >= stops.length) return;
+
+        // Swap in array
+        [stops[index], stops[newIndex]] = [stops[newIndex], stops[index]];
+
+        // Swap DOM elements
+        const rows = Array.from(stopsContainer.children);
+        const el = rows[index];
+        if (direction === -1) {
+            stopsContainer.insertBefore(el, rows[newIndex]);
+        } else {
+            stopsContainer.insertBefore(rows[newIndex], el);
+        }
+
+        renumberStops();
     }
 
     function removeStop(id) {
@@ -284,11 +331,9 @@
 
         const origin = startInput.value.trim();
         const destination = endInput.value.trim();
-        const waypoints = stops
-            .filter(s => s.address.trim().length > 0)
-            .map(s => s.address.trim());
+        const filledStops = stops.filter(s => s.address.trim().length > 0);
 
-        if (!origin || !destination || waypoints.length < 1) {
+        if (!origin || !destination || filledStops.length < 1) {
             alert('Please enter a start, end, and at least 1 stop.');
             return;
         }
@@ -298,34 +343,196 @@
         optimizeBtn.disabled = true;
         resultsSection.classList.add('hidden');
 
-        try {
-            const directionsService = new google.maps.DirectionsService();
+        // Separate pinned and unpinned stops
+        const pinnedStops = filledStops.filter(s => s.pinned);
+        const unpinnedStops = filledStops.filter(s => !s.pinned);
 
-            const request = {
-                origin: origin,
-                destination: destination,
-                waypoints: waypoints.map(addr => ({
-                    location: addr,
-                    stopover: true,
-                })),
-                optimizeWaypoints: true,
-                travelMode: google.maps.TravelMode.DRIVING,
-            };
+        // If there are pinned stops, we need to do segmented optimization
+        // Strategy: pinned stops define fixed waypoints in order,
+        // unpinned stops are distributed between pinned segments and optimized
+        if (pinnedStops.length === 0) {
+            // Simple case: optimize all waypoints freely
+            runDirections(origin, destination, filledStops.map(s => s.address.trim()), true);
+        } else {
+            // Build the route with pinned stops in fixed positions
+            // and optimize unpinned stops within segments
+            optimizeWithPinnedStops(origin, destination, filledStops);
+        }
+    }
 
-            directionsService.route(request, (result, status) => {
-                if (status === google.maps.DirectionsStatus.OK) {
-                    displayRoute(result, origin, waypoints);
+    function optimizeWithPinnedStops(origin, destination, filledStops) {
+        // Strategy: Send all waypoints but DON'T optimize.
+        // Instead, we manually figure out the best order:
+        // 1. Pinned stops stay in their exact positions
+        // 2. Unpinned stops between pinned stops get optimized within those segments
+
+        // First, identify segments between pinned stops
+        // A segment is a group of unpinned stops between two fixed points
+        const allAddresses = filledStops.map(s => s.address.trim());
+        const pinnedIndices = filledStops.reduce((acc, s, i) => {
+            if (s.pinned) acc.push(i);
+            return acc;
+        }, []);
+        const unpinnedIndices = filledStops.reduce((acc, s, i) => {
+            if (!s.pinned) acc.push(i);
+            return acc;
+        }, []);
+
+        if (unpinnedIndices.length === 0) {
+            // All stops are pinned — just route in order, no optimization
+            runDirections(origin, destination, allAddresses, false);
+            return;
+        }
+
+        // For the optimization: we keep pinned stops in order and let Google
+        // optimize the unpinned ones around them.
+        // We build waypoints array preserving pinned order.
+        // Google's optimizeWaypoints will reorder ALL waypoints, which we don't want.
+        // So we make multiple segment calls or use a single call without optimization
+        // but with our own ordering logic.
+
+        // Simpler approach: Use a single Directions call.
+        // Mark pinned waypoints as NOT optimizable by splitting into legs.
+        // Actually, the simplest correct approach:
+        // Build segments between fixed points, optimize each segment independently.
+
+        const segments = [];
+        let segStart = origin;
+        let currentUnpinned = [];
+
+        for (let i = 0; i < filledStops.length; i++) {
+            if (filledStops[i].pinned) {
+                // End current segment
+                if (currentUnpinned.length > 0) {
+                    segments.push({
+                        origin: segStart,
+                        destination: filledStops[i].address.trim(),
+                        waypoints: currentUnpinned.slice(),
+                        optimize: true,
+                    });
+                    currentUnpinned = [];
                 } else {
-                    handleDirectionsError(status);
+                    segments.push({
+                        origin: segStart,
+                        destination: filledStops[i].address.trim(),
+                        waypoints: [],
+                        optimize: false,
+                    });
                 }
-                optimizeBtn.innerHTML = 'Optimize Route';
-                optimizeBtn.disabled = false;
+                segStart = filledStops[i].address.trim();
+            } else {
+                currentUnpinned.push(filledStops[i].address.trim());
+            }
+        }
+
+        // Final segment to destination
+        if (currentUnpinned.length > 0) {
+            segments.push({
+                origin: segStart,
+                destination: destination,
+                waypoints: currentUnpinned.slice(),
+                optimize: true,
             });
-        } catch (error) {
-            alert('Error optimizing route. Please check your addresses and try again.');
+        } else {
+            segments.push({
+                origin: segStart,
+                destination: destination,
+                waypoints: [],
+                optimize: false,
+            });
+        }
+
+        // Now resolve each segment, then combine into one final ordered waypoints list
+        resolveSegments(segments, origin, destination);
+    }
+
+    function resolveSegments(segments, origin, destination) {
+        const directionsService = new google.maps.DirectionsService();
+        let resolvedWaypoints = [];
+        let completed = 0;
+        const segmentResults = new Array(segments.length);
+
+        segments.forEach((seg, idx) => {
+            if (seg.waypoints.length === 0) {
+                // No waypoints to optimize in this segment
+                segmentResults[idx] = [];
+                completed++;
+                if (completed === segments.length) {
+                    finalizeSegments(segmentResults, segments, origin, destination);
+                }
+            } else if (!seg.optimize || seg.waypoints.length === 1) {
+                // Only one waypoint or no optimization needed
+                segmentResults[idx] = seg.waypoints;
+                completed++;
+                if (completed === segments.length) {
+                    finalizeSegments(segmentResults, segments, origin, destination);
+                }
+            } else {
+                // Optimize this segment
+                const request = {
+                    origin: seg.origin,
+                    destination: seg.destination,
+                    waypoints: seg.waypoints.map(addr => ({ location: addr, stopover: true })),
+                    optimizeWaypoints: true,
+                    travelMode: google.maps.TravelMode.DRIVING,
+                };
+
+                directionsService.route(request, (result, status) => {
+                    if (status === google.maps.DirectionsStatus.OK) {
+                        const order = result.routes[0].waypoint_order;
+                        segmentResults[idx] = order.map(i => seg.waypoints[i]);
+                    } else {
+                        // Fallback: use original order
+                        segmentResults[idx] = seg.waypoints;
+                    }
+                    completed++;
+                    if (completed === segments.length) {
+                        finalizeSegments(segmentResults, segments, origin, destination);
+                    }
+                });
+            }
+        });
+    }
+
+    function finalizeSegments(segmentResults, segments, origin, destination) {
+        // Build final ordered waypoints list
+        const finalWaypoints = [];
+        for (let i = 0; i < segments.length; i++) {
+            // Add optimized waypoints for this segment
+            segmentResults[i].forEach(addr => finalWaypoints.push(addr));
+            // Add the segment destination (which is a pinned stop) unless it's the final destination
+            if (segments[i].destination !== destination) {
+                finalWaypoints.push(segments[i].destination);
+            }
+        }
+
+        // Now make one final directions call with the fully ordered waypoints (no optimization)
+        runDirections(origin, destination, finalWaypoints, false);
+    }
+
+    function runDirections(origin, destination, waypoints, optimize) {
+        const directionsService = new google.maps.DirectionsService();
+
+        const request = {
+            origin: origin,
+            destination: destination,
+            waypoints: waypoints.map(addr => ({
+                location: addr,
+                stopover: true,
+            })),
+            optimizeWaypoints: optimize,
+            travelMode: google.maps.TravelMode.DRIVING,
+        };
+
+        directionsService.route(request, (result, status) => {
+            if (status === google.maps.DirectionsStatus.OK) {
+                displayRoute(result, origin, waypoints);
+            } else {
+                handleDirectionsError(status);
+            }
             optimizeBtn.innerHTML = 'Optimize Route';
             optimizeBtn.disabled = false;
-        }
+        });
     }
 
     // Custom map markers
@@ -561,14 +768,17 @@
         route.stops.forEach(address => {
             const index = stops.length;
             const stopId = Date.now() + index + Math.random();
-            stops.push({ id: stopId, address: address });
+            stops.push({ id: stopId, address: address, pinned: false });
 
             const stopEl = document.createElement('div');
             stopEl.className = 'input-row';
             stopEl.dataset.id = stopId;
             stopEl.innerHTML = `
+                <button class="pin-btn" aria-label="Pin this stop" data-id="${stopId}" title="Pin to keep position">🔓</button>
                 <span class="stop-number">${index + 1}</span>
                 <input type="text" class="stop-input" placeholder="Enter destination address" autocomplete="new-password" data-id="${stopId}" value="${address}">
+                <button class="move-up-btn" aria-label="Move up" data-id="${stopId}">▲</button>
+                <button class="move-down-btn" aria-label="Move down" data-id="${stopId}">▼</button>
                 <button class="remove-btn" aria-label="Remove stop" data-id="${stopId}">✕</button>
             `;
 
@@ -576,6 +786,9 @@
 
             const input = stopEl.querySelector('.stop-input');
             const removeBtn = stopEl.querySelector('.remove-btn');
+            const pinBtn = stopEl.querySelector('.pin-btn');
+            const moveUpBtn = stopEl.querySelector('.move-up-btn');
+            const moveDownBtn = stopEl.querySelector('.move-down-btn');
 
             input.addEventListener('input', (e) => {
                 const stop = stops.find(s => s.id === stopId);
@@ -584,6 +797,9 @@
             });
 
             removeBtn.addEventListener('click', () => removeStop(stopId));
+            pinBtn.addEventListener('click', () => togglePin(stopId));
+            moveUpBtn.addEventListener('click', () => moveStop(stopId, -1));
+            moveDownBtn.addEventListener('click', () => moveStop(stopId, 1));
 
             // Enable autocomplete on the new input
             if (window.google && google.maps.places) {

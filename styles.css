@@ -553,3 +553,52 @@ body {
     border-color: var(--primary);
     outline: none;
 }
+
+
+/* Pin & Move Buttons */
+.pin-btn {
+    background: none;
+    border: none;
+    font-size: 1.1rem;
+    cursor: pointer;
+    padding: 4px 6px;
+    border-radius: 4px;
+    transition: background 0.2s;
+    flex-shrink: 0;
+}
+
+.pin-btn:hover {
+    background: rgba(0,0,0,0.05);
+}
+
+.move-up-btn,
+.move-down-btn {
+    background: none;
+    border: none;
+    font-size: 0.8rem;
+    cursor: pointer;
+    padding: 4px 6px;
+    border-radius: 4px;
+    color: var(--text-secondary);
+    flex-shrink: 0;
+}
+
+.move-up-btn:hover,
+.move-down-btn:hover {
+    background: rgba(0,0,0,0.05);
+    color: var(--text);
+}
+
+/* Pinned row highlight */
+.input-row.pinned {
+    background: rgba(251, 188, 4, 0.1);
+    border-left: 3px solid var(--warning);
+    margin-left: -3px;
+    border-radius: 6px;
+    padding-left: 8px;
+}
+
+.input-row.pinned .stop-number {
+    background: var(--warning);
+    color: #000;
+}
