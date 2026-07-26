@@ -294,6 +294,8 @@
             } else if (place.name) {
                 input.value = place.name;
             }
+            // Mark as confirmed from autocomplete
+            markConfirmed(input);
             // Update stop state if it's a stop input
             const stopId = parseInt(input.dataset.id);
             if (stopId) {
@@ -308,6 +310,11 @@
             if (e.key === 'Enter') {
                 e.preventDefault();
             }
+        });
+
+        // If user edits after selecting, un-confirm it
+        input.addEventListener('input', () => {
+            confirmedInputs.delete(input);
         });
 
         // Fix for mobile: prevent pac-container from disappearing on touch
@@ -346,50 +353,35 @@
     });
     observer.observe(stopsContainer, { childList: true });
 
-    // Address validation — highlights unresolvable addresses in yellow
-    async function validateAddresses(origin, destination, filledStops) {
-        const geocoder = new google.maps.Geocoder();
+    // Address validation — highlights addresses not picked from autocomplete
+    // Track which inputs have been confirmed via autocomplete
+    const confirmedInputs = new Set();
 
-        // Clear all previous warnings
+    function markConfirmed(input) {
+        confirmedInputs.add(input);
+        input.classList.remove('address-warning');
+    }
+
+    function validateBeforeOptimize() {
+        // Clear previous warnings
         startInput.classList.remove('address-warning');
         endInput.classList.remove('address-warning');
         document.querySelectorAll('.stop-input').forEach(input => {
             input.classList.remove('address-warning');
         });
 
-        // Helper: geocode and return true if found
-        function checkAddress(address) {
-            return new Promise(resolve => {
-                geocoder.geocode({ address: address }, (results, status) => {
-                    resolve(status === google.maps.GeocoderStatus.OK);
-                });
-            });
-        }
-
-        // Check origin
-        const originOk = await checkAddress(origin);
-        if (!originOk) {
+        // Highlight inputs that weren't confirmed by autocomplete
+        if (startInput.value.trim() && !confirmedInputs.has(startInput)) {
             startInput.classList.add('address-warning');
         }
-
-        // Check destination if applicable
-        if (destination && destination !== origin) {
-            const destOk = await checkAddress(destination);
-            if (!destOk) {
-                endInput.classList.add('address-warning');
-            }
+        if (endMode === 'address' && endInput.value.trim() && !confirmedInputs.has(endInput)) {
+            endInput.classList.add('address-warning');
         }
-
-        // Check each stop
-        for (const stop of filledStops) {
-            const ok = await checkAddress(stop.address.trim());
-            if (!ok) {
-                const input = stopsContainer.querySelector(`input[data-id="${stop.id}"]`);
-                if (input) {
-                    input.classList.add('address-warning');
-                }
+        document.querySelectorAll('.stop-input').forEach(input => {
+            if (input.value.trim() && !confirmedInputs.has(input)) {
+                input.classList.add('address-warning');
             }
-        }
+        });
     }
 
     // Route Optimization
@@ -427,8 +419,8 @@
         optimizeBtn.disabled = true;
         resultsSection.classList.add('hidden');
 
-        // Validate addresses (non-blocking — just highlights bad ones)
-        await validateAddresses(origin, destination, filledStops);
+        // Validate addresses (non-blocking — just highlights unconfirmed ones yellow)
+        validateBeforeOptimize();
 
         // Separate pinned and unpinned stops
         const pinnedStops = filledStops.filter(s => s.pinned);
