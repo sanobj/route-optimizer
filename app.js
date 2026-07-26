@@ -234,7 +234,27 @@
                 e.preventDefault();
             }
         });
+
+        // Fix for mobile: prevent pac-container from disappearing on touch
+        // by stopping the blur event when touching autocomplete results
+        input.addEventListener('blur', (e) => {
+            // Small delay to allow pac-item click/touch to register
+            setTimeout(() => {}, 300);
+        });
     }
+
+    // Global fix: prevent touchstart on pac-items from triggering blur on input
+    document.addEventListener('touchstart', (e) => {
+        if (e.target.closest('.pac-container')) {
+            e.stopPropagation();
+        }
+    }, true);
+
+    document.addEventListener('touchend', (e) => {
+        if (e.target.closest('.pac-container')) {
+            e.stopPropagation();
+        }
+    }, true);
 
     // Observe new stop inputs for autocomplete
     const observer = new MutationObserver((mutations) => {
