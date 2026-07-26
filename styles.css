@@ -388,3 +388,29 @@ body {
         gap: 8px;
     }
 }
+
+
+/* Google Places Autocomplete dropdown styling for mobile */
+.pac-container {
+    z-index: 10000 !important;
+    border-radius: 8px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+    border: none;
+    margin-top: 4px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+.pac-item {
+    padding: 10px 12px;
+    font-size: 0.95rem;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+}
+
+.pac-item:hover {
+    background: var(--bg);
+}
+
+.pac-item-query {
+    font-weight: 600;
+}

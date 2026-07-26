@@ -190,12 +190,17 @@
     function enableAutocomplete(input) {
         if (!window.google || !google.maps.places) return;
         const autocomplete = new google.maps.places.Autocomplete(input, {
-            types: ['address'],
+            types: ['geocode', 'establishment'],
+            fields: ['formatted_address', 'name', 'geometry'],
         });
+
+        // Fix for mobile: prevent Google's pac-container from being hidden behind elements
         autocomplete.addListener('place_changed', () => {
             const place = autocomplete.getPlace();
             if (place.formatted_address) {
                 input.value = place.formatted_address;
+            } else if (place.name) {
+                input.value = place.name;
             }
             // Update stop state if it's a stop input
             const stopId = parseInt(input.dataset.id);
@@ -204,6 +209,13 @@
                 if (stop) stop.address = input.value;
             }
             updateOptimizeButton();
+        });
+
+        // Prevent form submission on Enter (selects autocomplete instead)
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+            }
         });
     }
 
