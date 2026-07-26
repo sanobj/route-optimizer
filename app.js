@@ -188,9 +188,25 @@
         navigator.geolocation.getCurrentPosition(
             (position) => {
                 const { latitude, longitude } = position.coords;
-                startInput.value = `${latitude}, ${longitude}`;
-                gpsBtn.textContent = '🎯';
-                updateOptimizeButton();
+                // Reverse geocode to get a street address
+                if (window.google && google.maps) {
+                    const geocoder = new google.maps.Geocoder();
+                    geocoder.geocode({ location: { lat: latitude, lng: longitude } }, (results, status) => {
+                        if (status === 'OK' && results[0]) {
+                            startInput.value = results[0].formatted_address;
+                            markConfirmed(startInput);
+                        } else {
+                            // Fallback to coordinates if reverse geocode fails
+                            startInput.value = `${latitude}, ${longitude}`;
+                        }
+                        gpsBtn.textContent = '🎯';
+                        updateOptimizeButton();
+                    });
+                } else {
+                    startInput.value = `${latitude}, ${longitude}`;
+                    gpsBtn.textContent = '🎯';
+                    updateOptimizeButton();
+                }
             },
             (error) => {
                 gpsBtn.textContent = '🎯';
