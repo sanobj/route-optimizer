@@ -754,15 +754,26 @@
             </div>
         `;
 
-        // Intermediate stops in optimized order
+        // Stops with separators showing distance between each
         legs.forEach((leg, i) => {
             const isLast = i === legs.length - 1;
+
+            // Separator showing distance/time for this leg
+            stepsHtml += `
+                <div class="route-separator">
+                    <span class="separator-line"></span>
+                    <span class="separator-info">${leg.distance.text} · ${leg.duration.text}</span>
+                    <span class="separator-line"></span>
+                </div>
+            `;
+
+            // Stop
             stepsHtml += `
                 <div class="route-step">
                     <span class="${isLast ? 'marker' : 'stop-number'}">${isLast ? '🔴' : i + 1}</span>
                     <div class="step-info">
                         <div class="step-address">${leg.end_address}</div>
-                        <div class="step-detail">${leg.distance.text} · ${leg.duration.text}</div>
+                        <div class="step-detail">${isLast ? 'End' : 'Stop ' + (i + 1)}</div>
                     </div>
                 </div>
             `;
