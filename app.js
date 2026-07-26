@@ -194,7 +194,6 @@
                     geocoder.geocode({ location: { lat: latitude, lng: longitude } }, (results, status) => {
                         if (status === 'OK' && results[0]) {
                             startInput.value = results[0].formatted_address;
-                            markConfirmed(startInput);
                         } else {
                             // Fallback to coordinates if reverse geocode fails
                             startInput.value = `${latitude}, ${longitude}`;
@@ -310,8 +309,6 @@
             } else if (place.name) {
                 input.value = place.name;
             }
-            // Mark as confirmed from autocomplete
-            markConfirmed(input);
             // Update stop state if it's a stop input
             const stopId = parseInt(input.dataset.id);
             if (stopId) {
@@ -326,11 +323,6 @@
             if (e.key === 'Enter') {
                 e.preventDefault();
             }
-        });
-
-        // If user edits after selecting, un-confirm it
-        input.addEventListener('input', () => {
-            confirmedInputs.delete(input);
         });
 
         // Fix for mobile: prevent pac-container from disappearing on touch
@@ -369,37 +361,6 @@
     });
     observer.observe(stopsContainer, { childList: true });
 
-    // Address validation — highlights addresses not picked from autocomplete
-    // Track which inputs have been confirmed via autocomplete
-    const confirmedInputs = new Set();
-
-    function markConfirmed(input) {
-        confirmedInputs.add(input);
-        input.classList.remove('address-warning');
-    }
-
-    function validateBeforeOptimize() {
-        // Clear previous warnings
-        startInput.classList.remove('address-warning');
-        endInput.classList.remove('address-warning');
-        document.querySelectorAll('.stop-input').forEach(input => {
-            input.classList.remove('address-warning');
-        });
-
-        // Highlight inputs that weren't confirmed by autocomplete
-        if (startInput.value.trim() && !confirmedInputs.has(startInput)) {
-            startInput.classList.add('address-warning');
-        }
-        if (endMode === 'address' && endInput.value.trim() && !confirmedInputs.has(endInput)) {
-            endInput.classList.add('address-warning');
-        }
-        document.querySelectorAll('.stop-input').forEach(input => {
-            if (input.value.trim() && !confirmedInputs.has(input)) {
-                input.classList.add('address-warning');
-            }
-        });
-    }
-
     // Route Optimization
     async function optimizeRoute() {
         if (!apiKey) {
@@ -434,9 +395,6 @@
         optimizeBtn.innerHTML = '<span class="loading"></span> Optimizing...';
         optimizeBtn.disabled = true;
         resultsSection.classList.add('hidden');
-
-        // Validate addresses (non-blocking — just highlights unconfirmed ones yellow)
-        validateBeforeOptimize();
 
         // Separate pinned and unpinned stops
         const pinnedStops = filledStops.filter(s => s.pinned);
@@ -754,26 +712,15 @@
             </div>
         `;
 
-        // Stops with separators showing distance between each
+        // Intermediate stops in optimized order
         legs.forEach((leg, i) => {
             const isLast = i === legs.length - 1;
-
-            // Separator showing distance/time for this leg
-            stepsHtml += `
-                <div class="route-separator">
-                    <span class="separator-line"></span>
-                    <span class="separator-info">${leg.distance.text} · ${leg.duration.text}</span>
-                    <span class="separator-line"></span>
-                </div>
-            `;
-
-            // Stop
             stepsHtml += `
                 <div class="route-step">
                     <span class="${isLast ? 'marker' : 'stop-number'}">${isLast ? '🔴' : i + 1}</span>
                     <div class="step-info">
                         <div class="step-address">${leg.end_address}</div>
-                        <div class="step-detail">${isLast ? 'End' : 'Stop ' + (i + 1)}</div>
+                        <div class="step-detail">${leg.distance.text} · ${leg.duration.text}</div>
                     </div>
                 </div>
             `;

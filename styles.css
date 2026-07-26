@@ -642,33 +642,3 @@ body {
 .end-input-row.hidden {
     display: none;
 }
-
-
-/* Address validation warning */
-.address-warning {
-    background: rgba(251, 188, 4, 0.15) !important;
-    border-bottom: 2px solid var(--warning) !important;
-    border-radius: 4px;
-}
-
-
-/* Route separator between stops */
-.route-separator {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 4px 0;
-}
-
-.separator-line {
-    flex: 1;
-    height: 1px;
-    background: var(--border);
-}
-
-.separator-info {
-    font-size: 0.8rem;
-    color: var(--text-secondary);
-    white-space: nowrap;
-    font-weight: 500;
-}
