@@ -1,97 +1,85 @@
 # Route Optimizer PWA
 
-A Progressive Web App that optimizes multi-stop driving routes for the fastest/shortest path. Works on iPhone Safari and can be added to your home screen.
+A Progressive Web App that optimizes multi-stop driving routes for the fastest/shortest path. Works on iPhone Safari and can be added to your home screen like a native app.
 
-## Quick Start
+## Live App
 
-### 1. Get a Google Maps API Key (Free)
+**https://sanobj.github.io/route-optimizer/**
+
+## Features
+
+- 📍 GPS location detection (shows your street address, not coordinates)
+- 🔍 Address autocomplete powered by Google Places
+- 🗺️ Interactive map with numbered markers matching the route list
+- ⚡ Waypoint optimization (up to 25 stops)
+- 📌 Pin stops to lock them in position — only unpinned stops get optimized
+- ▲▼ Reorder stops manually with move buttons
+- 🔄 End mode options: No End, Round Trip, or custom End Address
+- 💾 Save and load routes (stored locally in your browser)
+- 📱 Installable as home screen app (PWA)
+- 🔒 API key stored locally on your device
+
+## How It Works
+
+1. **Enter your starting location** (or tap the GPS button for your current address)
+2. **Choose an end mode**: No End, Round Trip, or enter an End Address
+3. **Add your stops** — type and select from autocomplete suggestions
+4. **Pin any stops** you need in a fixed position (📌 button)
+5. **Reorder stops** with ▲▼ if needed
+6. **Tap "Optimize Route"** — Google reorders unpinned stops for the fastest route
+7. **View the timeline** with distance/time between each stop
+8. **Tap "Open in Google Maps"** for turn-by-turn navigation
+9. **Save the route** for later editing
+
+## Setup
+
+### 1. Google Maps API Key (Free)
 
 1. Go to [Google Cloud Console](https://console.cloud.google.com/)
-2. Create a new project (or select existing)
+2. Create a new project
 3. Enable these APIs:
    - **Directions API**
    - **Maps JavaScript API**
    - **Places API**
-4. Go to "Credentials" → "Create Credentials" → "API Key"
-5. Copy your API key
+   - **Geocoding API** (for GPS → street address)
+4. Create an API key under Credentials
+5. Restrict the key:
+   - HTTP referrers: `https://sanobj.github.io/*`
+   - API restrictions: select the 4 APIs above
 
-> Google gives you $200/month free credit — enough for ~40,000 route optimizations.
+> Google gives $200/month free credit — more than enough for personal use.
 
-### 2. Host the App (Free)
+### 2. Use the App
 
-**Option A: GitHub Pages (Recommended)**
+1. Open https://sanobj.github.io/route-optimizer/ on your phone
+2. Tap ⚙️ and enter your API key (one-time setup)
+3. Tap Share → "Add to Home Screen" for app-like experience
 
-1. Create a new GitHub repository
-2. Push this folder to it
-3. Go to Settings → Pages → Source: Deploy from branch → Main
-4. Your app will be live at `https://yourusername.github.io/route-optimizer/`
+## Hosting (Already Deployed)
 
-**Option B: Netlify (Drag & Drop)**
+The app is deployed on GitHub Pages via the workflow in `.github/workflows/deploy.yml`. Any push to `master` auto-deploys.
 
-1. Go to [netlify.com](https://www.netlify.com/)
-2. Drag this entire folder onto the deploy area
-3. Done — you get a URL immediately
-
-**Option C: Local Testing**
-
-```bash
-# If you have Python installed:
-python -m http.server 8000
-
-# Or Node.js:
-npx serve .
-```
-
-Then open `http://localhost:8000` in your browser.
-
-### 3. Add to iPhone Home Screen
-
-1. Open your hosted app URL in Safari
-2. Tap the Share button (square with arrow)
-3. Scroll down and tap "Add to Home Screen"
-4. Tap "Add"
-
-Now it looks and feels like a native app!
-
-## How It Works
-
-1. **Enter your starting location** (or tap the GPS button)
-2. **Add your destination stops** (minimum 2)
-3. **Tap "Optimize Route"** — the app calls Google's Directions API with `optimizeWaypoints: true`, which reorders your stops for the fastest route
-4. **View the optimized order** with total time and distance
-5. **Tap "Open in Google Maps"** for turn-by-turn navigation
-
-## Features
-
-- 📍 GPS location detection
-- 🔍 Address autocomplete (powered by Google Places)
-- 🗺️ Interactive map showing optimized route
-- ⚡ Waypoint optimization (up to 25 stops)
-- 📱 Installable as home screen app (PWA)
-- 🔒 API key stored locally on your device
+To host your own copy:
+- Fork the repo
+- Enable GitHub Pages in Settings → Pages → GitHub Actions
+- Update the API key referrer restriction to your domain
 
 ## Limitations
 
 - Maximum 25 waypoints (Google API limit)
 - Requires internet connection for route calculation
-- Turn-by-turn navigation handled by Google Maps app (not built-in)
+- Turn-by-turn navigation handled by Google Maps app
 
 ## Files
 
 ```
 route-optimizer/
-├── index.html          # Main HTML
-├── styles.css          # Styling
-├── app.js              # Application logic
-├── manifest.json       # PWA manifest
-├── sw.js               # Service worker for offline caching
-├── icon-192.svg        # App icon
-├── generate-icons.html # Helper to generate PNG icons
-└── README.md           # This file
+├── .github/workflows/deploy.yml  # GitHub Pages deployment
+├── index.html                    # Main HTML
+├── styles.css                    # Styling
+├── app.js                        # Application logic
+├── manifest.json                 # PWA manifest
+├── sw.js                         # Service worker for caching
+├── icon-192.svg                  # App icon
+└── README.md                     # This file
 ```
-
-## API Key Security Note
-
-Your API key is stored in your browser's localStorage. For production use, you should:
-1. Restrict the key to your domain in Google Cloud Console
-2. Enable only the APIs you need (Directions, Maps JS, Places)
