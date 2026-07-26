@@ -422,8 +422,13 @@ body {
 /* Responsive */
 @media (max-width: 400px) {
     .route-summary {
-        flex-direction: column;
         gap: 8px;
+    }
+    .route-summary .stat-value {
+        font-size: 1.1rem;
+    }
+    .route-summary .stat-label {
+        font-size: 0.7rem;
     }
 }
 
