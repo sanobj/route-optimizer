@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+<head><title>Generate Icons</title></head>
+<body>
+<p>Open this file in a browser to generate app icons, then right-click and save each canvas as PNG.</p>
+<canvas id="icon192" width="192" height="192"></canvas>
+<canvas id="icon512" width="512" height="512"></canvas>
+<script>
+function drawIcon(canvas) {
+    const ctx = canvas.getContext('2d');
+    const size = canvas.width;
+    const scale = size / 192;
+
+    // Background
+    ctx.fillStyle = '#1a73e8';
+    ctx.beginPath();
+    ctx.roundRect(0, 0, size, size, 32 * scale);
+    ctx.fill();
+
+    // Route line
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 8 * scale;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.beginPath();
+    ctx.moveTo(50 * scale, 140 * scale);
+    ctx.lineTo(70 * scale, 80 * scale);
+    ctx.lineTo(120 * scale, 110 * scale);
+    ctx.lineTo(145 * scale, 50 * scale);
+    ctx.stroke();
+
+    // Dots
+    ctx.fillStyle = '#34a853';
+    ctx.beginPath();
+    ctx.arc(50 * scale, 140 * scale, 12 * scale, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.arc(70 * scale, 80 * scale, 8 * scale, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.arc(120 * scale, 110 * scale, 8 * scale, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = '#ea4335';
+    ctx.beginPath();
+    ctx.arc(145 * scale, 50 * scale, 12 * scale, 0, Math.PI * 2);
+    ctx.fill();
+}
+
+drawIcon(document.getElementById('icon192'));
+drawIcon(document.getElementById('icon512'));
+</script>
+</body>
+</html>
