@@ -10,6 +10,7 @@
 
     // DOM Elements
     const startInput = document.getElementById('start-input');
+    const endInput = document.getElementById('end-input');
     const gpsBtn = document.getElementById('gps-btn');
     const stopsContainer = document.getElementById('stops-container');
     const addStopBtn = document.getElementById('add-stop-btn');
@@ -38,6 +39,7 @@
         cancelSettingsBtn.addEventListener('click', closeSettings);
         navigateBtn.addEventListener('click', openInGoogleMaps);
         startInput.addEventListener('input', updateOptimizeButton);
+        endInput.addEventListener('input', updateOptimizeButton);
 
         // Add two empty stops by default
         addStop();
@@ -99,8 +101,9 @@
 
     function updateOptimizeButton() {
         const hasStart = startInput.value.trim().length > 0;
+        const hasEnd = endInput.value.trim().length > 0;
         const filledStops = stops.filter(s => s.address.trim().length > 0);
-        optimizeBtn.disabled = !(hasStart && filledStops.length >= 2);
+        optimizeBtn.disabled = !(hasStart && hasEnd && filledStops.length >= 1);
     }
 
     // GPS
@@ -196,6 +199,7 @@
         // Enable Places Autocomplete on inputs
         console.log('Enabling autocomplete on inputs...');
         enableAutocomplete(startInput);
+        enableAutocomplete(endInput);
         document.querySelectorAll('.stop-input').forEach(input => {
             enableAutocomplete(input);
         });
@@ -279,12 +283,13 @@
         }
 
         const origin = startInput.value.trim();
+        const destination = endInput.value.trim();
         const waypoints = stops
             .filter(s => s.address.trim().length > 0)
             .map(s => s.address.trim());
 
-        if (!origin || waypoints.length < 2) {
-            alert('Please enter a starting location and at least 2 stops.');
+        if (!origin || !destination || waypoints.length < 1) {
+            alert('Please enter a start, end, and at least 1 stop.');
             return;
         }
 
@@ -296,20 +301,14 @@
         try {
             const directionsService = new google.maps.DirectionsService();
 
-            // Use last waypoint as destination, rest as waypoints
-            const destination = waypoints[waypoints.length - 1];
-            const intermediateWaypoints = waypoints.slice(0, -1).map(addr => ({
-                location: addr,
-                stopover: true,
-            }));
-
-            // If we want to return to origin (round trip), set destination = origin
-            // For now, optimize the order of all stops
             const request = {
                 origin: origin,
                 destination: destination,
-                waypoints: intermediateWaypoints,
-                optimizeWaypoints: true, // This is the magic — reorders for fastest route
+                waypoints: waypoints.map(addr => ({
+                    location: addr,
+                    stopover: true,
+                })),
+                optimizeWaypoints: true,
                 travelMode: google.maps.TravelMode.DRIVING,
             };
 
@@ -517,11 +516,12 @@
 
     function saveCurrentRoute() {
         const origin = startInput.value.trim();
+        const destination = endInput.value.trim();
         const waypoints = stops
             .filter(s => s.address.trim().length > 0)
             .map(s => s.address.trim());
 
-        if (!origin || waypoints.length === 0) {
+        if (!origin || !destination || waypoints.length === 0) {
             alert('Nothing to save. Enter addresses first.');
             return;
         }
@@ -533,6 +533,7 @@
             id: Date.now(),
             name: name.trim(),
             origin: origin,
+            destination: destination,
             stops: waypoints,
             createdAt: new Date().toLocaleDateString(),
         };
@@ -552,8 +553,9 @@
         stopsContainer.innerHTML = '';
         stops = [];
 
-        // Set origin
+        // Set origin and destination
         startInput.value = route.origin;
+        endInput.value = route.destination || '';
 
         // Add saved stops
         route.stops.forEach(address => {
@@ -613,7 +615,7 @@
         savedRoutesList.innerHTML = saved.map(route => `
             <div class="saved-route-card">
                 <div class="route-name">${route.name}</div>
-                <div class="route-stops-preview">📍 ${route.origin} → ${route.stops.length} stop${route.stops.length > 1 ? 's' : ''}</div>
+                <div class="route-stops-preview">🟢 ${route.origin} → ${route.stops.length} stop${route.stops.length > 1 ? 's' : ''} → 🔴 ${route.destination || 'N/A'}</div>
                 <div class="route-meta">Saved ${route.createdAt}</div>
                 <div class="saved-route-actions">
                     <button class="btn-load" onclick="window._loadRoute(${route.id})">Load</button>
