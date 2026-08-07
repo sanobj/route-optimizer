@@ -643,14 +643,22 @@
         });
 
         if (address) {
-            const infoWindow = new google.maps.InfoWindow({
-                content: `<div style="font-size:13px;font-weight:500;">${address}</div>`,
-                maxWidth: 220,
-            });
             marker.addListener('click', () => {
-                if (window._openInfoWindow) window._openInfoWindow.close();
-                infoWindow.open(map, marker);
-                window._openInfoWindow = infoWindow;
+                // Remove any existing custom tooltip
+                if (window._customTooltip) {
+                    window._customTooltip.remove();
+                    window._customTooltip = null;
+                }
+                // Create a simple tooltip div on the map container
+                const tooltip = document.createElement('div');
+                tooltip.className = 'map-tooltip';
+                tooltip.innerHTML = `<span>${address}</span><button class="tooltip-close">✕</button>`;
+                mapContainer.appendChild(tooltip);
+                window._customTooltip = tooltip;
+                tooltip.querySelector('.tooltip-close').addEventListener('click', () => {
+                    tooltip.remove();
+                    window._customTooltip = null;
+                });
             });
         }
 
