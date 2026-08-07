@@ -747,15 +747,16 @@
                 swipeState.row.style.transform = `translateX(${swipeState.currentX}px)`;
                 swipeState.row.style.transition = 'none';
 
-                // Show/update delete background
-                let bg = swipeState.row.parentElement.querySelector('.swipe-delete-bg');
-                if (!bg) {
+                // Show/update delete background (sibling positioned behind the row)
+                let bg = swipeState.row.previousElementSibling;
+                if (!bg || !bg.classList.contains('swipe-delete-bg')) {
                     bg = document.createElement('div');
                     bg.className = 'swipe-delete-bg';
                     bg.textContent = 'Delete';
                     swipeState.row.parentElement.insertBefore(bg, swipeState.row);
-                    bg.style.height = swipeState.row.offsetHeight + 'px';
                 }
+                bg.style.height = swipeState.row.offsetHeight + 'px';
+                bg.style.top = swipeState.row.offsetTop + 'px';
             }
         }, { passive: false });
 
@@ -772,8 +773,8 @@
                 row.style.transform = 'translateX(-100%)';
                 setTimeout(() => {
                     // Remove the delete background
-                    const bg = row.parentElement?.querySelector('.swipe-delete-bg');
-                    if (bg) bg.remove();
+                    const bg = row.previousElementSibling;
+                    if (bg && bg.classList.contains('swipe-delete-bg')) bg.remove();
 
                     // Determine what to delete
                     const id = Number(row.dataset.id);
@@ -796,8 +797,8 @@
                 setTimeout(() => {
                     row.style.transform = '';
                     row.style.transition = '';
-                    const bg = row.parentElement?.querySelector('.swipe-delete-bg');
-                    if (bg) bg.remove();
+                    const bg = row.previousElementSibling;
+                    if (bg && bg.classList.contains('swipe-delete-bg')) bg.remove();
                 }, 200);
             }
         });
