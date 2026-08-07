@@ -328,6 +328,22 @@ body {
     color: var(--text-secondary);
 }
 
+.input-clear-btn {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    font-size: 1rem;
+    cursor: pointer;
+    padding: 4px 6px;
+    border-radius: 4px;
+    flex-shrink: 0;
+}
+
+.input-clear-btn:hover {
+    color: var(--danger);
+    background: rgba(128,128,128,0.15);
+}
+
 .marker {
     font-size: 1rem;
     width: 24px;

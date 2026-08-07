@@ -57,6 +57,15 @@
         startInput.addEventListener('input', updateOptimizeButton);
         endInput.addEventListener('input', updateOptimizeButton);
 
+        document.getElementById('clear-start-btn')?.addEventListener('click', () => {
+            startInput.value = '';
+            updateOptimizeButton();
+        });
+        document.getElementById('clear-end-btn')?.addEventListener('click', () => {
+            endInput.value = '';
+            updateOptimizeButton();
+        });
+
         // End mode toggle
         endModeBtns.forEach(btn => {
             btn.addEventListener('click', () => {
