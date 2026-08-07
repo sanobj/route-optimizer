@@ -90,8 +90,7 @@
         stopEl.dataset.id = stopId;
         stopEl.innerHTML = `
             <button class="pin-btn" aria-label="Pin this stop" data-id="${stopId}" title="Pin to keep position">🔓</button>
-            <span class="stop-number">${index + 1}</span>
-            <span class="stop-type-badge" data-id="${stopId}"></span>
+            <span class="stop-number" data-id="${stopId}">${index + 1}</span>
             <input type="text" class="stop-input" placeholder="Enter destination address" autocomplete="new-password" data-id="${stopId}">
             <span class="drag-handle" data-id="${stopId}">☰</span>
             <button class="remove-btn" aria-label="Remove stop" data-id="${stopId}">✕</button>
@@ -231,68 +230,32 @@
         updateOptimizeButton();
     }
 
-    // ===== BUS/RES TAGGING MODE =====
-    let tagMode = null; // null, 'bus', or 'res'
-    const tagBusBtn = document.getElementById('tag-bus-btn');
-    const tagResBtn = document.getElementById('tag-res-btn');
-
-    if (tagBusBtn) {
-        tagBusBtn.addEventListener('click', () => {
-            if (tagMode === 'bus') {
-                tagMode = null;
-                tagBusBtn.classList.remove('active');
-            } else {
-                tagMode = 'bus';
-                tagBusBtn.classList.add('active');
-                if (tagResBtn) tagResBtn.classList.remove('active');
-            }
-        });
-    }
-
-    if (tagResBtn) {
-        tagResBtn.addEventListener('click', () => {
-            if (tagMode === 'res') {
-                tagMode = null;
-                tagResBtn.classList.remove('active');
-            } else {
-                tagMode = 'res';
-                tagResBtn.classList.add('active');
-                if (tagBusBtn) tagBusBtn.classList.remove('active');
-            }
-        });
-    }
-
-    // When in tag mode, clicking a stop row tags it
+    // ===== BUS/RES TYPE CYCLING =====
+    // Tap the stop number circle to cycle: none (blue) → bus (orange) → res (purple) → none
     stopsContainer.addEventListener('click', (e) => {
-        if (!tagMode) return;
-        // Don't interfere with pin, remove, or drag
-        if (e.target.closest('.pin-btn') || e.target.closest('.remove-btn') || e.target.closest('.drag-handle')) return;
+        const numberEl = e.target.closest('.stop-number');
+        if (!numberEl) return;
 
-        const row = e.target.closest('.input-row');
+        const row = numberEl.closest('.input-row');
         if (!row) return;
-
-        // If tapping the input while in tag mode, prevent focus and tag instead
-        if (e.target.closest('.stop-input')) {
-            e.target.blur();
-        }
 
         const id = parseInt(row.dataset.id) || parseFloat(row.dataset.id);
         const stop = stops.find(s => s.id === id);
         if (!stop) return;
 
-        // Toggle: if already this type, remove it; otherwise set it
-        if (stop.type === tagMode) {
-            stop.type = 'none';
+        // Cycle: none → bus → res → none
+        if (stop.type === 'none' || !stop.type) {
+            stop.type = 'bus';
+        } else if (stop.type === 'bus') {
+            stop.type = 'res';
         } else {
-            stop.type = tagMode;
+            stop.type = 'none';
         }
 
-        // Update badge
-        const badge = row.querySelector('.stop-type-badge');
-        if (badge) {
-            badge.className = 'stop-type-badge' + (stop.type === 'bus' ? ' badge-bus' : stop.type === 'res' ? ' badge-res' : '');
-            badge.textContent = stop.type === 'bus' ? 'B' : stop.type === 'res' ? 'R' : '';
-        }
+        // Update number circle color
+        numberEl.classList.remove('stop-num-bus', 'stop-num-res');
+        if (stop.type === 'bus') numberEl.classList.add('stop-num-bus');
+        if (stop.type === 'res') numberEl.classList.add('stop-num-res');
 
         // Update row styling
         row.classList.remove('row-bus', 'row-res');
@@ -1074,8 +1037,7 @@
             stopEl.dataset.id = stop.id;
             stopEl.innerHTML = `
                 <button class="pin-btn" aria-label="Pin this stop" data-id="${stop.id}" title="${stop.pinned ? 'Unpin to allow optimization' : 'Pin to keep position'}">${stop.pinned ? '📌' : '🔓'}</button>
-                <span class="stop-number">${index + 1}</span>
-                <span class="stop-type-badge ${stop.type === 'bus' ? 'badge-bus' : stop.type === 'res' ? 'badge-res' : ''}" data-id="${stop.id}">${stop.type === 'bus' ? 'B' : stop.type === 'res' ? 'R' : ''}</span>
+                <span class="stop-number ${stop.type === 'bus' ? 'stop-num-bus' : stop.type === 'res' ? 'stop-num-res' : ''}" data-id="${stop.id}">${index + 1}</span>
                 <input type="text" class="stop-input" placeholder="Enter destination address" autocomplete="new-password" data-id="${stop.id}" value="${stop.address}">
                 <span class="drag-handle" data-id="${stop.id}">☰</span>
                 <button class="remove-btn" aria-label="Remove stop" data-id="${stop.id}">✕</button>
@@ -1412,12 +1374,10 @@
             const stopEl = document.createElement('div');
             stopEl.className = 'input-row' + (pinned ? ' pinned' : '');
             stopEl.dataset.id = stopId;
-            const badgeClass = type === 'bus' ? 'badge-bus' : type === 'res' ? 'badge-res' : '';
-            const badgeText = type === 'bus' ? 'B' : type === 'res' ? 'R' : '';
+            const numClass = type === 'bus' ? 'stop-num-bus' : type === 'res' ? 'stop-num-res' : '';
             stopEl.innerHTML = `
                 <button class="pin-btn" aria-label="Pin this stop" data-id="${stopId}" title="${pinned ? 'Unpin to allow optimization' : 'Pin to keep position'}">${pinned ? '📌' : '🔓'}</button>
-                <span class="stop-number">${index + 1}</span>
-                <span class="stop-type-badge ${badgeClass}" data-id="${stopId}">${badgeText}</span>
+                <span class="stop-number ${numClass}" data-id="${stopId}">${index + 1}</span>
                 <input type="text" class="stop-input" placeholder="Enter destination address" autocomplete="new-password" data-id="${stopId}" value="${address}">
                 <span class="drag-handle" data-id="${stopId}">☰</span>
                 <button class="remove-btn" aria-label="Remove stop" data-id="${stopId}">✕</button>
@@ -1612,12 +1572,10 @@
             const stopEl = document.createElement('div');
             stopEl.className = 'input-row' + (pinned ? ' pinned' : '');
             stopEl.dataset.id = stopId;
-            const badgeClass = type === 'bus' ? 'badge-bus' : type === 'res' ? 'badge-res' : '';
-            const badgeText = type === 'bus' ? 'B' : type === 'res' ? 'R' : '';
+            const numClass = type === 'bus' ? 'stop-num-bus' : type === 'res' ? 'stop-num-res' : '';
             stopEl.innerHTML = `
                 <button class="pin-btn" aria-label="Pin this stop" data-id="${stopId}" title="${pinned ? 'Unpin to allow optimization' : 'Pin to keep position'}">${pinned ? '📌' : '🔓'}</button>
-                <span class="stop-number">${index + 1}</span>
-                <span class="stop-type-badge ${badgeClass}" data-id="${stopId}">${badgeText}</span>
+                <span class="stop-number ${numClass}" data-id="${stopId}">${index + 1}</span>
                 <input type="text" class="stop-input" placeholder="Enter destination address" autocomplete="new-password" data-id="${stopId}" value="${address}">
                 <span class="drag-handle" data-id="${stopId}">☰</span>
                 <button class="remove-btn" aria-label="Remove stop" data-id="${stopId}">✕</button>
