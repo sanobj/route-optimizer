@@ -638,6 +638,82 @@
         window._routeMarkers.push(marker);
     }
 
+    function reorderStopsToMatch(orderedAddresses) {
+        // Reorder the stops array and DOM to match the optimized route order
+        // orderedAddresses is the list of waypoint addresses in optimized order
+        if (!orderedAddresses || orderedAddresses.length === 0) return;
+
+        const filledStops = stops.filter(s => s.address.trim().length > 0);
+        const emptyStops = stops.filter(s => s.address.trim().length === 0);
+
+        // Build new ordered array of filled stops based on optimized addresses
+        const reordered = [];
+        const used = new Set();
+
+        orderedAddresses.forEach(addr => {
+            // Find the matching stop (by address, case-insensitive)
+            const match = filledStops.find((s, i) => !used.has(i) && s.address.trim().toLowerCase() === addr.toLowerCase());
+            if (match) {
+                used.add(filledStops.indexOf(match));
+                reordered.push(match);
+            } else {
+                // Fallback: try partial match (Google may return slightly different formatting)
+                const partial = filledStops.find((s, i) => !used.has(i));
+                if (partial) {
+                    used.add(filledStops.indexOf(partial));
+                    partial.address = addr; // Update to the Google-formatted address
+                    reordered.push(partial);
+                }
+            }
+        });
+
+        // Add any remaining filled stops that weren't matched
+        filledStops.forEach((s, i) => {
+            if (!used.has(i)) reordered.push(s);
+        });
+
+        // Rebuild stops array: reordered filled + empty
+        stops = [...reordered, ...emptyStops];
+
+        // Rebuild DOM
+        stopsContainer.innerHTML = '';
+        stops.forEach((stop, index) => {
+            const stopEl = document.createElement('div');
+            stopEl.className = 'input-row' + (stop.pinned ? ' pinned' : '');
+            stopEl.dataset.id = stop.id;
+            stopEl.innerHTML = `
+                <button class="pin-btn" aria-label="Pin this stop" data-id="${stop.id}" title="${stop.pinned ? 'Unpin to allow optimization' : 'Pin to keep position'}">${stop.pinned ? '📌' : '🔓'}</button>
+                <span class="stop-number">${index + 1}</span>
+                <input type="text" class="stop-input" placeholder="Enter destination address" autocomplete="new-password" data-id="${stop.id}" value="${stop.address}">
+                <button class="move-up-btn" aria-label="Move up" data-id="${stop.id}">▲</button>
+                <button class="move-down-btn" aria-label="Move down" data-id="${stop.id}">▼</button>
+                <button class="remove-btn" aria-label="Remove stop" data-id="${stop.id}">✕</button>
+            `;
+            stopsContainer.appendChild(stopEl);
+
+            const input = stopEl.querySelector('.stop-input');
+            const removeBtn = stopEl.querySelector('.remove-btn');
+            const pinBtn = stopEl.querySelector('.pin-btn');
+            const moveUpBtn = stopEl.querySelector('.move-up-btn');
+            const moveDownBtn = stopEl.querySelector('.move-down-btn');
+
+            input.addEventListener('input', (e) => {
+                const s = stops.find(st => st.id === stop.id);
+                if (s) s.address = e.target.value;
+                updateOptimizeButton();
+            });
+
+            removeBtn.addEventListener('click', () => removeStop(stop.id));
+            pinBtn.addEventListener('click', () => togglePin(stop.id));
+            moveUpBtn.addEventListener('click', () => moveStop(stop.id, -1));
+            moveDownBtn.addEventListener('click', () => moveStop(stop.id, 1));
+
+            if (window.google && google.maps.places) {
+                enableAutocomplete(input);
+            }
+        });
+    }
+
     function displayRoute(result, origin, originalWaypoints) {
         // Show on map
         if (directionsRenderer) {
@@ -647,14 +723,38 @@
         }
         mapContainer.classList.add('active');
 
+        // Reorder the input stops to match the optimized route
+        const route = result.routes[0];
+        const legs = route.legs;
+
+        // Update start input to Google-formatted address
+        startInput.value = legs[0].start_address;
+
+        // The intermediate stops are legs[0].end_address through legs[n-2].end_address
+        // (last leg end is the destination, not a waypoint)
+        if (legs.length > 1) {
+            const optimizedStopAddresses = legs.slice(0, -1).map(leg => leg.end_address);
+            reorderStopsToMatch(optimizedStopAddresses);
+        } else if (legs.length === 1 && stops.filter(s => s.address.trim()).length === 1) {
+            // Single stop — update its address to the Google-formatted version
+            const filledStop = stops.find(s => s.address.trim().length > 0);
+            if (filledStop) {
+                filledStop.address = legs[0].end_address;
+                const input = stopsContainer.querySelector(`[data-id="${filledStop.id}"] .stop-input`);
+                if (input) input.value = filledStop.address;
+            }
+        }
+
+        // Update end input if in address mode
+        if (endMode === 'address') {
+            endInput.value = legs[legs.length - 1].end_address;
+        }
+
         // Clear old custom markers
         if (window._routeMarkers) {
             window._routeMarkers.forEach(m => m.setMap(null));
         }
         window._routeMarkers = [];
-
-        const route = result.routes[0];
-        const legs = route.legs;
 
         // Add custom numbered markers
         // Start marker (green)
