@@ -449,6 +449,66 @@
         stops.splice(toIndex, 0, item);
     }
 
+    // ===== MOUSE DRAG TO REORDER (Desktop) =====
+    stopsContainer.addEventListener('mousedown', (e) => {
+        const handle = e.target.closest('.drag-handle');
+        if (!handle) return;
+
+        e.preventDefault();
+        const row = handle.closest('.input-row');
+        if (!row) return;
+
+        dragState = {
+            row: row,
+            id: parseInt(row.dataset.id) || parseFloat(row.dataset.id),
+            startY: e.clientY,
+        };
+
+        row.classList.add('dragging');
+        row.style.zIndex = '100';
+
+        const onMouseMove = (ev) => {
+            if (!dragState) return;
+
+            const rows = Array.from(stopsContainer.querySelectorAll('.input-row'));
+            const currentIndex = rows.indexOf(dragState.row);
+
+            for (let i = 0; i < rows.length; i++) {
+                if (i === currentIndex) continue;
+                const rect = rows[i].getBoundingClientRect();
+                const midY = rect.top + rect.height / 2;
+
+                if (i < currentIndex && ev.clientY < midY) {
+                    stopsContainer.insertBefore(dragState.row, rows[i]);
+                    swapStops(currentIndex, i);
+                    break;
+                } else if (i > currentIndex && ev.clientY > midY) {
+                    if (rows[i].nextSibling) {
+                        stopsContainer.insertBefore(dragState.row, rows[i].nextSibling);
+                    } else {
+                        stopsContainer.appendChild(dragState.row);
+                    }
+                    swapStops(currentIndex, i);
+                    break;
+                }
+            }
+        };
+
+        const onMouseUp = () => {
+            if (dragState) {
+                dragState.row.classList.remove('dragging');
+                dragState.row.style.zIndex = '';
+                dragState = null;
+                renumberStops();
+            }
+            document.removeEventListener('mousemove', onMouseMove);
+            document.removeEventListener('mouseup', onMouseUp);
+        };
+
+        document.addEventListener('mousemove', onMouseMove);
+        document.addEventListener('mouseup', onMouseUp);
+    });
+
     // Route Optimization
     async function optimizeRoute() {
         if (!apiKey) {
