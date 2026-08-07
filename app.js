@@ -181,6 +181,23 @@
     }
 
     function clearAll() {
+        // Save current state to history before clearing (if there's anything to save)
+        const origin = startInput.value.trim();
+        const filledStops = stops.filter(s => s.address.trim().length > 0);
+        if (origin || filledStops.length > 0) {
+            const destination = endMode === 'address' ? endInput.value.trim() : '';
+            saveToHistory({
+                origin: origin || '(none)',
+                destination: destination || '(none)',
+                stops: filledStops.map(s => ({ address: s.address, pinned: s.pinned })),
+                totalTime: '-',
+                totalDistance: '-',
+                timestamp: Date.now(),
+                endMode: endMode,
+                cleared: true,
+            });
+        }
+
         // Clear start
         startInput.value = '';
 
@@ -1351,9 +1368,10 @@
                 hour: 'numeric', minute: '2-digit'
             });
             const stopCount = entry.stops ? entry.stops.length : 0;
+            const clearedTag = entry.cleared ? ' <span class="history-cleared">Cleared</span>' : '';
             return `
-                <div class="history-card">
-                    <div class="history-title">${date}</div>
+                <div class="history-card${entry.cleared ? ' history-card-cleared' : ''}">
+                    <div class="history-title">${date}${clearedTag}</div>
                     <div class="history-route">
                         <span class="history-origin">📍 ${entry.origin}</span>
                         <span class="history-arrow">→ ${stopCount} stop${stopCount !== 1 ? 's' : ''} →</span>

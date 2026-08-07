@@ -102,6 +102,20 @@ body {
     color: var(--text);
 }
 
+.history-cleared {
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: var(--danger);
+    background: rgba(234, 67, 53, 0.1);
+    border-radius: 4px;
+    padding: 1px 5px;
+    margin-left: 6px;
+}
+
+.history-card-cleared {
+    border-color: rgba(234, 67, 53, 0.3);
+}
+
 .history-route {
     display: flex;
     flex-direction: column;
