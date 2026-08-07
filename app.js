@@ -43,7 +43,7 @@
     function init() {
         addStopBtn.addEventListener('click', addStop);
         optimizeBtn.addEventListener('click', optimizeRoute);
-        document.getElementById('clear-btn').addEventListener('click', clearAll);
+        document.getElementById('clear-btn')?.addEventListener('click', clearAll);
         gpsBtn.addEventListener('click', getCurrentLocation);
         settingsBtn.addEventListener('click', openSettings);
         saveKeyBtn.addEventListener('click', saveApiKey);
@@ -731,7 +731,6 @@
                 }
             } else {
                 optimizeWithPinnedStops(origin, destination, stopsForOptimize);
-            }
             }
         }
     }
