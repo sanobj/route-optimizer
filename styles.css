@@ -5,6 +5,22 @@
 }
 
 :root {
+    --primary: #1a73e8;
+    --primary-dark: #1557b0;
+    --success: #34a853;
+    --danger: #ea4335;
+    --warning: #fbbc04;
+    --bg: #f8f9fa;
+    --surface: #ffffff;
+    --surface-alt: #f0f0f0;
+    --text: #202124;
+    --text-secondary: #5f6368;
+    --border: #dadce0;
+    --radius: 12px;
+    --shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+[data-theme="dark"] {
     --primary: #4da6ff;
     --primary-dark: #2b8ae6;
     --success: #4caf50;
@@ -16,7 +32,6 @@
     --text: #e0e0e0;
     --text-secondary: #9e9e9e;
     --border: #3a3a4e;
-    --radius: 12px;
     --shadow: 0 2px 8px rgba(0,0,0,0.4);
 }
 
@@ -267,11 +282,20 @@ body {
     padding: 8px;
     border-radius: 50%;
     transition: background 0.2s;
+}
+
+[data-theme="dark"] .icon-btn {
     filter: brightness(1.3) saturate(1.5);
 }
 
+.icon-btn.text-icon {
+    font-size: 1.4rem;
+    color: var(--primary);
+    filter: none !important;
+}
+
 .icon-btn:hover {
-    background: rgba(255,255,255,0.1);
+    background: rgba(128,128,128,0.15);
 }
 
 /* Address Section */
@@ -348,7 +372,7 @@ body {
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(0,0,0,0.7);
+    background: rgba(0,0,0,0.5);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -660,7 +684,7 @@ body {
 .pac-container {
     z-index: 10000 !important;
     border-radius: 8px;
-    box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.2);
     border: 1px solid var(--border);
     margin-top: 4px;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -675,7 +699,7 @@ body {
     font-size: 0.9rem;
     border-bottom: 1px solid var(--border);
     cursor: pointer;
-    -webkit-tap-highlight-color: rgba(255,255,255,0.1);
+    -webkit-tap-highlight-color: rgba(0,0,0,0.1);
     touch-action: manipulation;
     white-space: normal;
     line-height: 1.4;
@@ -832,7 +856,7 @@ body {
 }
 
 .pin-btn:hover {
-    background: rgba(255,255,255,0.1);
+    background: rgba(128,128,128,0.15);
 }
 
 /* Drag Handle */

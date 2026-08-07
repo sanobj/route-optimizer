@@ -8,6 +8,10 @@
     let directionsRenderer = null;
     let apiKey = localStorage.getItem('googleMapsApiKey') || '';
     let advancedUI = localStorage.getItem('advancedUI') === 'true';
+    let darkMode = localStorage.getItem('darkMode') === 'true';
+
+    // Apply theme immediately to prevent flash
+    if (darkMode) document.documentElement.setAttribute('data-theme', 'dark');
 
     // DOM Elements
     const startInput = document.getElementById('start-input');
@@ -324,6 +328,7 @@
 
     function openSettings() {
         apiKeyInput.value = apiKey;
+        document.getElementById('dark-mode-toggle').checked = darkMode;
         document.getElementById('advanced-ui-toggle').checked = advancedUI;
         if (advancedInfo) advancedInfo.classList.add('hidden');
         settingsModal.classList.remove('hidden');
@@ -342,6 +347,11 @@
         apiKey = key;
         localStorage.setItem('googleMapsApiKey', apiKey);
 
+        // Save dark mode setting
+        darkMode = document.getElementById('dark-mode-toggle').checked;
+        localStorage.setItem('darkMode', darkMode.toString());
+        applyTheme();
+
         // Save advanced UI setting
         advancedUI = document.getElementById('advanced-ui-toggle').checked;
         localStorage.setItem('advancedUI', advancedUI.toString());
@@ -349,6 +359,29 @@
 
         closeSettings();
         loadGoogleMaps();
+    }
+
+    function applyTheme() {
+        if (darkMode) {
+            document.documentElement.setAttribute('data-theme', 'dark');
+        } else {
+            document.documentElement.removeAttribute('data-theme');
+        }
+        // Update Google Maps style if map exists
+        if (map) {
+            map.setOptions({
+                styles: darkMode ? [
+                    { elementType: 'geometry', stylers: [{ color: '#1d2c4d' }] },
+                    { elementType: 'labels.text.fill', stylers: [{ color: '#8ec3b9' }] },
+                    { elementType: 'labels.text.stroke', stylers: [{ color: '#1a3646' }] },
+                    { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#304a7d' }] },
+                    { featureType: 'road', elementType: 'geometry.stroke', stylers: [{ color: '#255763' }] },
+                    { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#0e1626' }] },
+                    { featureType: 'poi', elementType: 'geometry', stylers: [{ color: '#283d6a' }] },
+                    { featureType: 'transit', elementType: 'geometry', stylers: [{ color: '#2f3948' }] },
+                ] : [],
+            });
+        }
     }
 
     function applyAdvancedUI() {
@@ -400,7 +433,7 @@
             disableDefaultUI: true,
             zoomControl: true,
             gestureHandling: 'cooperative',
-            styles: [
+            styles: darkMode ? [
                 { elementType: 'geometry', stylers: [{ color: '#1d2c4d' }] },
                 { elementType: 'labels.text.fill', stylers: [{ color: '#8ec3b9' }] },
                 { elementType: 'labels.text.stroke', stylers: [{ color: '#1a3646' }] },
@@ -409,7 +442,7 @@
                 { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#0e1626' }] },
                 { featureType: 'poi', elementType: 'geometry', stylers: [{ color: '#283d6a' }] },
                 { featureType: 'transit', elementType: 'geometry', stylers: [{ color: '#2f3948' }] },
-            ],
+            ] : [],
         });
         directionsRenderer = new google.maps.DirectionsRenderer({
             map: map,
