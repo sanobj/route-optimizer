@@ -827,23 +827,52 @@
         const minutes = Math.round((totalDuration % 3600) / 60);
         const timeStr = hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
 
+        // Build leg breakdown HTML
+        let breakdownHtml = '<div class="route-breakdown hidden">';
+        legs.forEach((leg, i) => {
+            const fromLabel = i === 0 ? 'Start' : `Stop ${i}`;
+            const toLabel = i === legs.length - 1 ? 'End' : `Stop ${i + 1}`;
+            breakdownHtml += `
+                <div class="breakdown-leg">
+                    <div class="breakdown-from">${leg.start_address}</div>
+                    <div class="breakdown-arrow">↓ ${leg.distance.text} · ${leg.duration.text}</div>
+                    <div class="breakdown-to">${leg.end_address}</div>
+                </div>
+            `;
+        });
+        breakdownHtml += '</div>';
+
         // Display summary
         routeSummary.innerHTML = `
-            <div class="stat">
-                <div class="stat-value">${timeStr}</div>
-                <div class="stat-label">Total Time</div>
+            <div class="summary-stats">
+                <div class="stat">
+                    <div class="stat-value">${timeStr}</div>
+                    <div class="stat-label">Total Time</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value">${distanceMiles} mi</div>
+                    <div class="stat-label">Total Distance</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value">${legs.length + 1}</div>
+                    <div class="stat-label">Stops</div>
+                </div>
             </div>
-            <div class="stat">
-                <div class="stat-value">${distanceMiles} mi</div>
-                <div class="stat-label">Total Distance</div>
-            </div>
-            <div class="stat">
-                <div class="stat-value">${legs.length + 1}</div>
-                <div class="stat-label">Stops</div>
-            </div>
+            <div class="summary-expand-hint">Tap for breakdown ▾</div>
+            ${breakdownHtml}
         `;
         routeSummary.classList.remove('hidden');
         resultActions.classList.remove('hidden');
+
+        // Toggle breakdown on click
+        routeSummary.onclick = () => {
+            const breakdown = routeSummary.querySelector('.route-breakdown');
+            const hint = routeSummary.querySelector('.summary-expand-hint');
+            if (breakdown) {
+                breakdown.classList.toggle('hidden');
+                hint.textContent = breakdown.classList.contains('hidden') ? 'Tap for breakdown ▾' : 'Tap to collapse ▴';
+            }
+        };
 
         // Save optimized route for Google Maps navigation link
         optimizedRoute = {
