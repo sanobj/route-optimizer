@@ -1197,8 +1197,8 @@
         updateOptimizeButton();
         closeSavedRoutes();
 
-        // Scroll to top
-        window.scrollTo({ top: 0, behavior: 'smooth' });
+        // Auto-optimize the loaded route
+        setTimeout(() => optimizeRoute(), 100);
     }
 
     function deleteRoute(id) {
@@ -1376,7 +1376,8 @@
 
         updateOptimizeButton();
         closeHistory();
-        window.scrollTo({ top: 0, behavior: 'smooth' });
+        // Auto-optimize the loaded route
+        setTimeout(() => optimizeRoute(), 100);
     }
 
     function deleteHistory(idx) {
