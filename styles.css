@@ -563,9 +563,14 @@ body {
 /* Map Filter */
 .map-filter-row {
     display: flex;
-    gap: 6px;
-    margin-top: 16px;
+    gap: 0;
+    margin-top: 24px;
+    margin-bottom: 0;
     justify-content: center;
+    background: var(--surface);
+    border-radius: var(--radius) var(--radius) 0 0;
+    padding: 8px;
+    box-shadow: var(--shadow);
 }
 
 .map-filter-row.hidden {
@@ -575,19 +580,20 @@ body {
 .map-filter-btn {
     padding: 6px 16px;
     border-radius: 6px;
-    border: 2px solid var(--border);
+    border: none;
     background: transparent;
     color: var(--text-secondary);
     font-size: 0.8rem;
     font-weight: 700;
     cursor: pointer;
     transition: all 0.2s;
+    flex: 1;
 }
 
 .map-filter-btn.active {
-    border-color: var(--primary);
     background: var(--primary);
     color: white;
+    border-radius: 6px;
 }
 
 .map-filter-btn:hover:not(.active) {
@@ -604,6 +610,12 @@ body {
     box-shadow: var(--shadow);
     background: var(--border);
     display: none;
+}
+
+.map-filter-row + .map-container {
+    margin-top: 0;
+    border-top-left-radius: 0;
+    border-top-right-radius: 0;
 }
 
 .map-container.active {
