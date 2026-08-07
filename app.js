@@ -91,7 +91,7 @@
         stops.push({ id: stopId, address: '', pinned: false, type: 'none' });
 
         const stopEl = document.createElement('div');
-        stopEl.className = 'input-row';
+        stopEl.className = 'input-row' + (advancedUI ? ' row-default' : '');
         stopEl.dataset.id = stopId;
         stopEl.innerHTML = `
             <button class="pin-btn" aria-label="Pin this stop" data-id="${stopId}" title="Pin to keep position">🔓</button>
@@ -264,9 +264,10 @@
         if (stop.type === 'res') numberEl.classList.add('stop-num-res');
 
         // Update row styling
-        row.classList.remove('row-bus', 'row-res');
+        row.classList.remove('row-default', 'row-bus', 'row-res');
         if (stop.type === 'bus') row.classList.add('row-bus');
-        if (stop.type === 'res') row.classList.add('row-res');
+        else if (stop.type === 'res') row.classList.add('row-res');
+        else row.classList.add('row-default');
     });
 
     // GPS
@@ -398,7 +399,14 @@
                 el.classList.remove('stop-num-bus', 'stop-num-res');
             });
             stopsContainer.querySelectorAll('.input-row').forEach(el => {
-                el.classList.remove('row-bus', 'row-res');
+                el.classList.remove('row-default', 'row-bus', 'row-res');
+            });
+        } else {
+            // Add row-default to any rows that don't already have a type class
+            stopsContainer.querySelectorAll('.input-row').forEach(el => {
+                if (!el.classList.contains('row-bus') && !el.classList.contains('row-res')) {
+                    el.classList.add('row-default');
+                }
             });
         }
     }
@@ -1104,7 +1112,7 @@
         stopsContainer.innerHTML = '';
         stops.forEach((stop, index) => {
             const stopEl = document.createElement('div');
-            stopEl.className = 'input-row' + (stop.pinned ? ' pinned' : '');
+            stopEl.className = 'input-row' + (stop.pinned ? ' pinned' : '') + (advancedUI ? (stop.type === 'bus' ? ' row-bus' : stop.type === 'res' ? ' row-res' : ' row-default') : '');
             stopEl.dataset.id = stop.id;
             stopEl.innerHTML = `
                 <button class="pin-btn" aria-label="Pin this stop" data-id="${stop.id}" title="${stop.pinned ? 'Unpin to allow optimization' : 'Pin to keep position'}">${stop.pinned ? '📌' : '🔓'}</button>

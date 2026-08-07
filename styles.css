@@ -286,13 +286,7 @@ body {
 }
 
 [data-theme="dark"] .icon-btn {
-    filter: brightness(1.3) saturate(1.5);
-}
-
-.icon-btn.text-icon {
-    font-size: 1.4rem;
-    color: var(--primary);
-    filter: none !important;
+    filter: brightness(1.5) saturate(1.5);
 }
 
 .icon-btn:hover {
@@ -922,6 +916,12 @@ body {
 
 
 /* Row type highlights */
+.input-row.row-default {
+    border-left: 3px solid var(--primary);
+    margin-left: -3px;
+    padding-left: 8px;
+}
+
 .input-row.row-bus {
     border-left: 3px solid #ff8c00;
     margin-left: -3px;
