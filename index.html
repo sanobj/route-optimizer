@@ -66,15 +66,18 @@
                     <input type="checkbox" id="dark-mode-toggle">
                 </div>
                 <div class="settings-toggle">
-                    <label for="advanced-ui-toggle">Advanced UI (Bus/Res) <button type="button" class="info-btn" id="advanced-info-btn">ⓘ</button></label>
+                    <label for="advanced-ui-toggle">Advanced UI <button type="button" class="info-btn" id="advanced-info-btn">ⓘ</button></label>
                     <input type="checkbox" id="advanced-ui-toggle">
                 </div>
                 <div id="advanced-info" class="settings-info hidden">
-                    <p>Tap the numbered circle on each stop to cycle:</p>
-                    <p><span class="info-dot" style="background:#4da6ff;"></span> Default — no priority</p>
-                    <p><span class="info-dot" style="background:#ff8c00;"></span> Business — optimized first</p>
-                    <p><span class="info-dot" style="background:#9c27b0;"></span> Residence — optimized after businesses</p>
-                    <p class="hint">Businesses always route before residences. Pinned stops override priority. Map filter (All/Bus/Res) appears above the map. Swipe left on any address to delete it.</p>
+                    <p><strong>Advanced UI adds:</strong></p>
+                    <p>• <span class="info-dot" style="background:#ff8c00;"></span> Business priority — tap circle to mark as business (optimized first)</p>
+                    <p>• <span class="info-dot" style="background:#9c27b0;"></span> Residence — tap circle to mark as residence (optimized after businesses)</p>
+                    <p>• <span class="info-dot" style="background:#4da6ff;"></span> Default — no priority assigned</p>
+                    <p>• Map filter (All/Bus/Res) to view only specific stop types</p>
+                    <p>• Swipe left on any address to delete it</p>
+                    <p>• X buttons hidden (replaced by swipe)</p>
+                    <p class="hint">Pinned stops always override priority order.</p>
                 </div>
                 <div class="modal-actions">
                     <button id="save-key-btn" class="btn btn-primary">Save</button>
