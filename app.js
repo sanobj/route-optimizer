@@ -1464,7 +1464,7 @@
         const destination = endMode === 'address' ? endInput.value.trim() : '';
         const waypoints = stops
             .filter(s => s.address.trim().length > 0)
-            .map(s => ({ address: s.address.trim(), pinned: s.pinned }));
+            .map(s => ({ address: s.address.trim(), pinned: s.pinned, type: s.type || 'none' }));
 
         if (!origin || waypoints.length === 0) {
             alert('Nothing to save. Enter addresses first.');
