@@ -916,7 +916,7 @@ body {
 .input-row.pinned {
     background: rgba(255, 183, 77, 0.15);
     border-left: 3px solid var(--warning);
-    margin-left: -3px;
+    padding-left: 8px;
     border-radius: 6px;
     padding-left: 8px;
 }
@@ -945,19 +945,16 @@ body {
 /* Row type highlights */
 .input-row.row-default {
     border-left: 3px solid var(--primary);
-    margin-left: -3px;
     padding-left: 8px;
 }
 
 .input-row.row-bus {
     border-left: 3px solid #ff8c00;
-    margin-left: -3px;
     padding-left: 8px;
 }
 
 .input-row.row-res {
     border-left: 3px solid #9c27b0;
-    margin-left: -3px;
     padding-left: 8px;
 }
 
