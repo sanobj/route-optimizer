@@ -216,11 +216,12 @@
         // Hide summary and actions
         routeSummary.classList.add('hidden');
         resultActions.classList.add('hidden');
+        document.getElementById('map-filter-row').classList.add('hidden');
 
         // Clear map
         if (directionsRenderer) directionsRenderer.setDirections({ routes: [] });
         if (window._routeMarkers) {
-            window._routeMarkers.forEach(m => m.setMap(null));
+            window._routeMarkers.forEach(m => m.marker.setMap(null));
             window._routeMarkers = [];
         }
 
@@ -389,6 +390,16 @@
             disableDefaultUI: true,
             zoomControl: true,
             gestureHandling: 'cooperative',
+            styles: [
+                { elementType: 'geometry', stylers: [{ color: '#1d2c4d' }] },
+                { elementType: 'labels.text.fill', stylers: [{ color: '#8ec3b9' }] },
+                { elementType: 'labels.text.stroke', stylers: [{ color: '#1a3646' }] },
+                { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#304a7d' }] },
+                { featureType: 'road', elementType: 'geometry.stroke', stylers: [{ color: '#255763' }] },
+                { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#0e1626' }] },
+                { featureType: 'poi', elementType: 'geometry', stylers: [{ color: '#283d6a' }] },
+                { featureType: 'transit', elementType: 'geometry', stylers: [{ color: '#2f3948' }] },
+            ],
         });
         directionsRenderer = new google.maps.DirectionsRenderer({
             map: map,
@@ -924,10 +935,10 @@
                 scale: 0,
             },
         });
-        window._routeMarkers.push(marker);
+        window._routeMarkers.push({ marker, type: 'start' });
     }
 
-    function addNumberedMarker(position, label, color, address) {
+    function addNumberedMarker(position, label, color, address, stopType) {
         const svg = `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
             <svg xmlns="http://www.w3.org/2000/svg" width="32" height="40" viewBox="0 0 32 40">
                 <path d="M16 0C7.2 0 0 7.2 0 16c0 12 16 24 16 24s16-12 16-24C32 7.2 24.8 0 16 0z" fill="${color}"/>
@@ -959,7 +970,7 @@
             });
         }
 
-        window._routeMarkers.push(marker);
+        window._routeMarkers.push({ marker, type: stopType || 'none' });
     }
 
     window._closeInfoWindow = function() {
@@ -968,6 +979,32 @@
             window._openInfoWindow = null;
         }
     };
+
+    // ===== MAP FILTER =====
+    const mapFilterRow = document.getElementById('map-filter-row');
+    const mapFilterBtns = mapFilterRow.querySelectorAll('.map-filter-btn');
+
+    mapFilterBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            mapFilterBtns.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            const filter = btn.dataset.filter;
+            applyMapFilter(filter);
+        });
+    });
+
+    function applyMapFilter(filter) {
+        if (!window._routeMarkers) return;
+        window._routeMarkers.forEach(item => {
+            if (filter === 'all') {
+                item.marker.setVisible(true);
+            } else if (filter === 'bus') {
+                item.marker.setVisible(item.type === 'bus' || item.type === 'start');
+            } else if (filter === 'res') {
+                item.marker.setVisible(item.type === 'res' || item.type === 'start');
+            }
+        });
+    }
 
     function reorderStopsToMatch(orderedAddresses, excludeLast) {
         // Reorder the stops array and DOM to match the optimized route order
@@ -1098,7 +1135,7 @@
 
         // Clear old custom markers
         if (window._routeMarkers) {
-            window._routeMarkers.forEach(m => m.setMap(null));
+            window._routeMarkers.forEach(m => m.marker.setMap(null));
         }
         window._routeMarkers = [];
 
@@ -1111,20 +1148,24 @@
             const isLast = i === legs.length - 1;
             const label = isLast ? '●' : String(i + 1);
             let color;
+            let markerType = 'none';
             if (isLast) {
                 color = '#ea4335'; // red for end
+                markerType = 'end';
             } else {
                 // Match stop type by index in the reordered stops array
                 const stop = stops[i];
                 if (stop && stop.type === 'bus') {
                     color = '#ff8c00'; // orange for business
+                    markerType = 'bus';
                 } else if (stop && stop.type === 'res') {
                     color = '#9c27b0'; // purple for residence
+                    markerType = 'res';
                 } else {
                     color = '#1a73e8'; // blue default
                 }
             }
-            addNumberedMarker(leg.end_location, label, color, leg.end_address);
+            addNumberedMarker(leg.end_location, label, color, leg.end_address, markerType);
         });
 
         // Calculate totals
@@ -1175,6 +1216,7 @@
         `;
         routeSummary.classList.remove('hidden');
         resultActions.classList.remove('hidden');
+        document.getElementById('map-filter-row').classList.remove('hidden');
 
         // Toggle breakdown on click
         routeSummary.onclick = () => {

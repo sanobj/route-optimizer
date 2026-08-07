@@ -5,18 +5,19 @@
 }
 
 :root {
-    --primary: #1a73e8;
-    --primary-dark: #1557b0;
-    --success: #34a853;
-    --danger: #ea4335;
-    --warning: #fbbc04;
-    --bg: #f8f9fa;
-    --surface: #ffffff;
-    --text: #202124;
-    --text-secondary: #5f6368;
-    --border: #dadce0;
+    --primary: #4da6ff;
+    --primary-dark: #2b8ae6;
+    --success: #4caf50;
+    --danger: #ef5350;
+    --warning: #ffb74d;
+    --bg: #121212;
+    --surface: #1e1e2e;
+    --surface-alt: #2a2a3e;
+    --text: #e0e0e0;
+    --text-secondary: #9e9e9e;
+    --border: #3a3a4e;
     --radius: 12px;
-    --shadow: 0 2px 8px rgba(0,0,0,0.1);
+    --shadow: 0 2px 8px rgba(0,0,0,0.4);
 }
 
 body {
@@ -87,7 +88,7 @@ body {
 }
 
 .history-card {
-    background: var(--bg);
+    background: var(--surface-alt);
     border-radius: 8px;
     padding: 12px;
     border: 1px solid var(--border);
@@ -191,7 +192,7 @@ body {
 
 .btn-add:hover {
     border-color: var(--primary);
-    background: rgba(26, 115, 232, 0.05);
+    background: rgba(77, 166, 255, 0.1);
 }
 
 .stops-action-row {
@@ -235,7 +236,7 @@ body {
 .btn-optimize:hover:not(:disabled) {
     background: var(--primary-dark);
     transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(26, 115, 232, 0.3);
+    box-shadow: 0 4px 12px rgba(77, 166, 255, 0.3);
 }
 
 .btn-optimize:disabled {
@@ -269,7 +270,7 @@ body {
 }
 
 .icon-btn:hover {
-    background: rgba(0,0,0,0.05);
+    background: rgba(255,255,255,0.1);
 }
 
 /* Address Section */
@@ -335,7 +336,7 @@ body {
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(0,0,0,0.5);
+    background: rgba(0,0,0,0.7);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -489,6 +490,40 @@ body {
     padding-left: 8px;
 }
 
+/* Map Filter */
+.map-filter-row {
+    display: flex;
+    gap: 6px;
+    margin-top: 16px;
+    justify-content: center;
+}
+
+.map-filter-row.hidden {
+    display: none;
+}
+
+.map-filter-btn {
+    padding: 6px 16px;
+    border-radius: 6px;
+    border: 2px solid var(--border);
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.map-filter-btn.active {
+    border-color: var(--primary);
+    background: var(--primary);
+    color: white;
+}
+
+.map-filter-btn:hover:not(.active) {
+    border-color: var(--text-secondary);
+}
+
 /* Map */
 .map-container {
     width: 100%;
@@ -595,7 +630,7 @@ body {
 }
 
 .btn-save:hover {
-    background: rgba(26, 115, 232, 0.05);
+    background: rgba(77, 166, 255, 0.1);
 }
 
 /* Saved Routes */
@@ -616,7 +651,7 @@ body {
 }
 
 .saved-route-card {
-    background: var(--bg);
+    background: var(--surface-alt);
     border-radius: 8px;
     padding: 12px;
     display: flex;
@@ -708,7 +743,7 @@ body {
 }
 
 .pin-btn:hover {
-    background: rgba(0,0,0,0.05);
+    background: rgba(255,255,255,0.1);
 }
 
 /* Drag Handle */
@@ -730,8 +765,8 @@ body {
 
 /* Dragging state */
 .input-row.dragging {
-    background: rgba(26, 115, 232, 0.08);
-    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    background: rgba(77, 166, 255, 0.15);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
     border-radius: 8px;
     opacity: 0.9;
 }
@@ -753,7 +788,7 @@ body {
 
 /* Pinned row highlight */
 .input-row.pinned {
-    background: rgba(251, 188, 4, 0.1);
+    background: rgba(255, 183, 77, 0.15);
     border-left: 3px solid var(--warning);
     margin-left: -3px;
     border-radius: 6px;
@@ -870,7 +905,7 @@ body {
 
 .end-mode-btn.active {
     border-color: var(--primary);
-    background: rgba(26, 115, 232, 0.08);
+    background: rgba(77, 166, 255, 0.15);
     color: var(--primary);
 }
 

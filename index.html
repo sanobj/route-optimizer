@@ -6,7 +6,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="RouteOpt">
-    <meta name="theme-color" content="#1a73e8">
+    <meta name="theme-color" content="#121212">
     <title>Route Optimizer</title>
     <link rel="manifest" href="manifest.json">
     <link rel="apple-touch-icon" href="icon-192.png">
@@ -112,6 +112,11 @@
         <div id="route-summary" class="route-summary hidden"></div>
 
         <!-- Map Section -->
+        <div class="map-filter-row hidden" id="map-filter-row">
+            <button class="map-filter-btn active" data-filter="all">All</button>
+            <button class="map-filter-btn" data-filter="bus">Bus</button>
+            <button class="map-filter-btn" data-filter="res">Res</button>
+        </div>
         <div id="map" class="map-container"></div>
 
         <!-- Action Buttons (shown after optimization) -->
