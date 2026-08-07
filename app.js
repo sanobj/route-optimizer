@@ -870,20 +870,21 @@
             if (stopsForOptimize.length === 1) {
                 runDirections(origin, stopsForOptimize[0].address.trim(), [], false);
             } else {
-                const allAddresses = stopsForOptimize.map(s => s.address.trim());
-                const dest = allAddresses[allAddresses.length - 1];
-                const waypoints = allAddresses.slice(0, -1);
+                // Last stop in sorted order becomes destination
+                const dest = stopsForOptimize[stopsForOptimize.length - 1].address.trim();
+                const stopsWithoutDest = stopsForOptimize.slice(0, -1);
+                const waypoints = stopsWithoutDest.map(s => s.address.trim());
 
                 if (pinnedStops.length === 0) {
                     // Optimize bus stops and res stops separately to keep bus first
                     const hasMixedTypes = unpinnedBus.length > 0 && (unpinnedRes.length > 0 || unpinnedNone.length > 0);
                     if (hasMixedTypes) {
-                        optimizeWithPinnedStops(origin, dest, stopsForOptimize);
+                        optimizeWithPinnedStops(origin, dest, stopsWithoutDest);
                     } else {
                         runDirections(origin, dest, waypoints, true);
                     }
                 } else {
-                    optimizeWithPinnedStops(origin, dest, stopsForOptimize);
+                    optimizeWithPinnedStops(origin, dest, stopsWithoutDest);
                 }
             }
         } else {
