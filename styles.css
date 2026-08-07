@@ -428,6 +428,18 @@ body {
     text-overflow: ellipsis;
 }
 
+.breakdown-label {
+    display: inline-block;
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: white;
+    background: var(--primary);
+    border-radius: 4px;
+    padding: 1px 5px;
+    margin-right: 4px;
+    vertical-align: middle;
+}
+
 .breakdown-arrow {
     font-size: 0.75rem;
     color: var(--primary);
