@@ -216,7 +216,7 @@
         // Hide summary and actions
         routeSummary.classList.add('hidden');
         resultActions.classList.add('hidden');
-        document.getElementById('map-filter-row').classList.add('hidden');
+        if (mapFilterRow) mapFilterRow.classList.add('hidden');
 
         // Clear map
         if (directionsRenderer) directionsRenderer.setDirections({ routes: [] });
@@ -236,27 +236,31 @@
     const tagBusBtn = document.getElementById('tag-bus-btn');
     const tagResBtn = document.getElementById('tag-res-btn');
 
-    tagBusBtn.addEventListener('click', () => {
-        if (tagMode === 'bus') {
-            tagMode = null;
-            tagBusBtn.classList.remove('active');
-        } else {
-            tagMode = 'bus';
-            tagBusBtn.classList.add('active');
-            tagResBtn.classList.remove('active');
-        }
-    });
+    if (tagBusBtn) {
+        tagBusBtn.addEventListener('click', () => {
+            if (tagMode === 'bus') {
+                tagMode = null;
+                tagBusBtn.classList.remove('active');
+            } else {
+                tagMode = 'bus';
+                tagBusBtn.classList.add('active');
+                if (tagResBtn) tagResBtn.classList.remove('active');
+            }
+        });
+    }
 
-    tagResBtn.addEventListener('click', () => {
-        if (tagMode === 'res') {
-            tagMode = null;
-            tagResBtn.classList.remove('active');
-        } else {
-            tagMode = 'res';
-            tagResBtn.classList.add('active');
-            tagBusBtn.classList.remove('active');
-        }
-    });
+    if (tagResBtn) {
+        tagResBtn.addEventListener('click', () => {
+            if (tagMode === 'res') {
+                tagMode = null;
+                tagResBtn.classList.remove('active');
+            } else {
+                tagMode = 'res';
+                tagResBtn.classList.add('active');
+                if (tagBusBtn) tagBusBtn.classList.remove('active');
+            }
+        });
+    }
 
     // When in tag mode, clicking a stop row tags it
     stopsContainer.addEventListener('click', (e) => {
@@ -982,16 +986,18 @@
 
     // ===== MAP FILTER =====
     const mapFilterRow = document.getElementById('map-filter-row');
-    const mapFilterBtns = mapFilterRow.querySelectorAll('.map-filter-btn');
+    const mapFilterBtns = mapFilterRow ? mapFilterRow.querySelectorAll('.map-filter-btn') : [];
 
-    mapFilterBtns.forEach(btn => {
-        btn.addEventListener('click', () => {
-            mapFilterBtns.forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-            const filter = btn.dataset.filter;
-            applyMapFilter(filter);
+    if (mapFilterRow) {
+        mapFilterBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                mapFilterBtns.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                const filter = btn.dataset.filter;
+                applyMapFilter(filter);
+            });
         });
-    });
+    }
 
     function applyMapFilter(filter) {
         if (!window._routeMarkers) return;
@@ -1216,7 +1222,7 @@
         `;
         routeSummary.classList.remove('hidden');
         resultActions.classList.remove('hidden');
-        document.getElementById('map-filter-row').classList.remove('hidden');
+        if (mapFilterRow) mapFilterRow.classList.remove('hidden');
 
         // Toggle breakdown on click
         routeSummary.onclick = () => {
