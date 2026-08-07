@@ -36,6 +36,9 @@
     // Track currently loaded saved route name
     let currentLoadedRouteName = null;
 
+    // Suppress scroll when auto-optimizing from load
+    let suppressScroll = false;
+
     // Initialize
     function init() {
         addStopBtn.addEventListener('click', addStop);
@@ -1037,6 +1040,11 @@
             endMode: endMode,
         });
 
+        // Scroll to map unless suppressed (e.g. auto-optimize from load)
+        if (!suppressScroll) {
+            mapContainer.scrollIntoView({ behavior: 'smooth' });
+        }
+        suppressScroll = false;
     }
 
     function handleDirectionsError(status) {
@@ -1215,6 +1223,7 @@
         closeSavedRoutes();
 
         // Auto-optimize the loaded route
+        suppressScroll = true;
         setTimeout(() => optimizeRoute(), 100);
     }
 
@@ -1397,6 +1406,7 @@
         updateOptimizeButton();
         closeHistory();
         // Auto-optimize the loaded route
+        suppressScroll = true;
         setTimeout(() => optimizeRoute(), 100);
     }
 
