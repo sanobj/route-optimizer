@@ -55,6 +55,31 @@ A Progressive Web App that optimizes multi-stop driving routes for the fastest/s
 2. Tap ⚙️ and enter your API key (one-time setup)
 3. Tap Share → "Add to Home Screen" for app-like experience
 
+## Install as a Phone App
+
+This is a Progressive Web App (PWA), so you can install it to your home screen and use it like a native app — no app store needed.
+
+### iPhone (Safari)
+
+1. Open https://sanobj.github.io/route-optimizer/ in **Safari**
+2. Tap the **Share** button (square with arrow at the bottom)
+3. Scroll down and tap **"Add to Home Screen"**
+4. Name it whatever you want and tap **Add**
+5. The app icon will appear on your home screen
+
+### Android (Chrome)
+
+1. Open https://sanobj.github.io/route-optimizer/ in **Chrome**
+2. Tap the **three-dot menu** (top right)
+3. Tap **"Add to Home screen"** or **"Install app"**
+4. Confirm the install
+
+### Notes
+
+- The app works offline for cached pages, but needs internet to calculate routes
+- Your API key and saved routes are stored locally on the device
+- To update the app after changes are pushed, close it completely and reopen — or delete and re-add to home screen if the cache is stuck
+
 ## Hosting (Already Deployed)
 
 The app is deployed on GitHub Pages via the workflow in `.github/workflows/deploy.yml`. Any push to `master` auto-deploys.
