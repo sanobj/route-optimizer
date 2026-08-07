@@ -914,7 +914,7 @@
         // Show each leg's distance/time then the next address
         legs.forEach((leg, i) => {
             breakdownHtml += `<div class="breakdown-arrow">↓ ${leg.distance.text} · ${leg.duration.text}</div>`;
-            const label = i === legs.length - 1 ? 'End' : `Stop ${i + 1}`;
+            const label = i === legs.length - 1 ? 'End' : `${i + 1}`;
             breakdownHtml += `<div class="breakdown-stop"><span class="breakdown-label">${label}</span> ${leg.end_address}</div>`;
         });
         breakdownHtml += '</div>';
