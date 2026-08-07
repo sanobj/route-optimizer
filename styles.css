@@ -245,6 +245,7 @@ body {
     padding: 16px;
     font-size: 1.1rem;
     margin-top: 16px;
+    margin-bottom: 8px;
     box-shadow: var(--shadow);
 }
 
@@ -342,8 +343,8 @@ body {
 }
 
 .stop-number {
-    width: 24px;
-    height: 24px;
+    width: 28px;
+    height: 28px;
     background: var(--primary);
     color: white;
     border-radius: 50%;
@@ -355,6 +356,7 @@ body {
     flex-shrink: 0;
     cursor: pointer;
     transition: background 0.2s;
+    -webkit-tap-highlight-color: rgba(0,0,0,0.2);
 }
 
 .stop-number.stop-num-bus {
@@ -637,9 +639,14 @@ body {
 }
 
 .map-filter-row + .map-container {
-    margin-top: 0;
     border-top-left-radius: 0;
     border-top-right-radius: 0;
+}
+
+.map-filter-row.hidden + .map-container {
+    margin-top: 24px;
+    border-top-left-radius: var(--radius);
+    border-top-right-radius: var(--radius);
 }
 
 .map-container.active {

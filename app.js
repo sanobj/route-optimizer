@@ -245,7 +245,7 @@
         const row = numberEl.closest('.input-row');
         if (!row) return;
 
-        const id = parseInt(row.dataset.id) || parseFloat(row.dataset.id);
+        const id = Number(row.dataset.id);
         const stop = stops.find(s => s.id === id);
         if (!stop) return;
 
