@@ -878,13 +878,15 @@
         };
 
         // Auto-save to route history
+        const filledStopsForHistory = stops.filter(s => s.address.trim().length > 0);
         saveToHistory({
             origin: legs[0].start_address,
             destination: legs[legs.length - 1].end_address,
-            stops: legs.slice(0, -1).map(leg => leg.end_address),
+            stops: filledStopsForHistory.map(s => ({ address: s.address, pinned: s.pinned })),
             totalTime: timeStr,
             totalDistance: distanceMiles + ' mi',
             timestamp: Date.now(),
+            endMode: endMode,
         });
 
         // Scroll to map
@@ -1178,26 +1180,34 @@
         // Set origin
         startInput.value = entry.origin;
 
-        // Set end mode to address with the destination
-        endMode = 'address';
+        // Restore end mode
+        const savedEndMode = entry.endMode || 'address';
+        endMode = savedEndMode;
         endModeBtns.forEach(btn => {
-            btn.classList.toggle('active', btn.dataset.mode === 'address');
+            btn.classList.toggle('active', btn.dataset.mode === endMode);
         });
-        endInputRow.classList.remove('hidden');
-        endInput.value = entry.destination;
+        if (endMode === 'address') {
+            endInputRow.classList.remove('hidden');
+            endInput.value = entry.destination;
+        } else {
+            endInputRow.classList.add('hidden');
+            endInput.value = '';
+        }
 
-        // Add stops
+        // Add stops (supports both old format [string] and new format [{address, pinned}])
         const allStops = entry.stops || [];
-        allStops.forEach(address => {
+        allStops.forEach(stopData => {
+            const address = typeof stopData === 'string' ? stopData : stopData.address;
+            const pinned = typeof stopData === 'string' ? false : !!stopData.pinned;
             const index = stops.length;
             const stopId = Date.now() + index + Math.random();
-            stops.push({ id: stopId, address: address, pinned: false });
+            stops.push({ id: stopId, address: address, pinned: pinned });
 
             const stopEl = document.createElement('div');
-            stopEl.className = 'input-row';
+            stopEl.className = 'input-row' + (pinned ? ' pinned' : '');
             stopEl.dataset.id = stopId;
             stopEl.innerHTML = `
-                <button class="pin-btn" aria-label="Pin this stop" data-id="${stopId}" title="Pin to keep position">🔓</button>
+                <button class="pin-btn" aria-label="Pin this stop" data-id="${stopId}" title="${pinned ? 'Unpin to allow optimization' : 'Pin to keep position'}">${pinned ? '📌' : '🔓'}</button>
                 <span class="stop-number">${index + 1}</span>
                 <input type="text" class="stop-input" placeholder="Enter destination address" autocomplete="new-password" data-id="${stopId}" value="${address}">
                 <button class="move-up-btn" aria-label="Move up" data-id="${stopId}">▲</button>
