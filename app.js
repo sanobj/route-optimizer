@@ -91,7 +91,7 @@
         stopEl.innerHTML = `
             <button class="pin-btn" aria-label="Pin this stop" data-id="${stopId}" title="Pin to keep position">🔓</button>
             <span class="stop-number">${index + 1}</span>
-            <input type="text" class="stop-input" placeholder="Enter destination address" autocomplete="new-password" inputmode="search" data-id="${stopId}">
+            <input type="text" class="stop-input" placeholder="Enter destination address" autocomplete="new-password" data-id="${stopId}">
             <span class="drag-handle" data-id="${stopId}">☰</span>
             <button class="remove-btn" aria-label="Remove stop" data-id="${stopId}">✕</button>
         `;
@@ -310,7 +310,7 @@
             zoom: 4,
             disableDefaultUI: true,
             zoomControl: true,
-            gestureHandling: 'greedy',
+            gestureHandling: 'cooperative',
         });
         directionsRenderer = new google.maps.DirectionsRenderer({
             map: map,
@@ -910,7 +910,7 @@
             stopEl.innerHTML = `
                 <button class="pin-btn" aria-label="Pin this stop" data-id="${stop.id}" title="${stop.pinned ? 'Unpin to allow optimization' : 'Pin to keep position'}">${stop.pinned ? '📌' : '🔓'}</button>
                 <span class="stop-number">${index + 1}</span>
-                <input type="text" class="stop-input" placeholder="Enter destination address" autocomplete="new-password" inputmode="search" data-id="${stop.id}" value="${stop.address}">
+                <input type="text" class="stop-input" placeholder="Enter destination address" autocomplete="new-password" data-id="${stop.id}" value="${stop.address}">
                 <span class="drag-handle" data-id="${stop.id}">☰</span>
                 <button class="remove-btn" aria-label="Remove stop" data-id="${stop.id}">✕</button>
             `;
@@ -1229,7 +1229,7 @@
             stopEl.innerHTML = `
                 <button class="pin-btn" aria-label="Pin this stop" data-id="${stopId}" title="Pin to keep position">🔓</button>
                 <span class="stop-number">${index + 1}</span>
-                <input type="text" class="stop-input" placeholder="Enter destination address" autocomplete="new-password" inputmode="search" data-id="${stopId}" value="${address}">
+                <input type="text" class="stop-input" placeholder="Enter destination address" autocomplete="new-password" data-id="${stopId}" value="${address}">
                 <span class="drag-handle" data-id="${stopId}">☰</span>
                 <button class="remove-btn" aria-label="Remove stop" data-id="${stopId}">✕</button>
             `;
@@ -1415,7 +1415,7 @@
             stopEl.innerHTML = `
                 <button class="pin-btn" aria-label="Pin this stop" data-id="${stopId}" title="${pinned ? 'Unpin to allow optimization' : 'Pin to keep position'}">${pinned ? '📌' : '🔓'}</button>
                 <span class="stop-number">${index + 1}</span>
-                <input type="text" class="stop-input" placeholder="Enter destination address" autocomplete="new-password" inputmode="search" data-id="${stopId}" value="${address}">
+                <input type="text" class="stop-input" placeholder="Enter destination address" autocomplete="new-password" data-id="${stopId}" value="${address}">
                 <span class="drag-handle" data-id="${stopId}">☰</span>
                 <button class="remove-btn" aria-label="Remove stop" data-id="${stopId}">✕</button>
             `;
