@@ -358,31 +358,47 @@
 
     // ===== TOUCH DRAG TO REORDER =====
     let dragState = null;
+    let dragHoldTimer = null;
+    let dragReady = false;
 
     stopsContainer.addEventListener('touchstart', (e) => {
         const handle = e.target.closest('.drag-handle');
         if (!handle) return;
 
-        e.preventDefault();
         const row = handle.closest('.input-row');
         if (!row) return;
 
-        const rect = row.getBoundingClientRect();
         const touch = e.touches[0];
 
-        dragState = {
-            row: row,
-            id: parseInt(row.dataset.id) || parseFloat(row.dataset.id),
-            startY: touch.clientY,
-            offsetY: touch.clientY - rect.top,
-            rowHeight: rect.height,
-        };
+        // Start a hold timer — must hold for 500ms before drag activates
+        dragReady = false;
+        dragHoldTimer = setTimeout(() => {
+            dragReady = true;
+            const rect = row.getBoundingClientRect();
 
-        row.classList.add('dragging');
-        row.style.zIndex = '100';
-    }, { passive: false });
+            dragState = {
+                row: row,
+                id: parseInt(row.dataset.id) || parseFloat(row.dataset.id),
+                startY: touch.clientY,
+                offsetY: touch.clientY - rect.top,
+                rowHeight: rect.height,
+            };
+
+            row.classList.add('dragging');
+            row.style.zIndex = '100';
+            // Haptic feedback if available
+            if (navigator.vibrate) navigator.vibrate(30);
+        }, 500);
+    }, { passive: true });
 
     stopsContainer.addEventListener('touchmove', (e) => {
+        // If hold timer hasn't fired yet, cancel it (user is scrolling)
+        if (!dragReady && dragHoldTimer) {
+            clearTimeout(dragHoldTimer);
+            dragHoldTimer = null;
+            return;
+        }
+
         if (!dragState) return;
         e.preventDefault();
 
@@ -415,6 +431,9 @@
     }, { passive: false });
 
     stopsContainer.addEventListener('touchend', () => {
+        clearTimeout(dragHoldTimer);
+        dragHoldTimer = null;
+        dragReady = false;
         if (!dragState) return;
         dragState.row.classList.remove('dragging');
         dragState.row.style.zIndex = '';
