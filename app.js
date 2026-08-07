@@ -7,6 +7,7 @@
     let map = null;
     let directionsRenderer = null;
     let apiKey = localStorage.getItem('googleMapsApiKey') || '';
+    let advancedUI = localStorage.getItem('advancedUI') === 'true';
 
     // DOM Elements
     const startInput = document.getElementById('start-input');
@@ -233,6 +234,7 @@
     // ===== BUS/RES TYPE CYCLING =====
     // Tap the stop number circle to cycle: none (blue) → bus (orange) → res (purple) → none
     stopsContainer.addEventListener('click', (e) => {
+        if (!advancedUI) return;
         const numberEl = e.target.closest('.stop-number');
         if (!numberEl) return;
 
@@ -313,6 +315,7 @@
     // Settings
     function openSettings() {
         apiKeyInput.value = apiKey;
+        document.getElementById('advanced-ui-toggle').checked = advancedUI;
         settingsModal.classList.remove('hidden');
     }
 
@@ -328,8 +331,33 @@
         }
         apiKey = key;
         localStorage.setItem('googleMapsApiKey', apiKey);
+
+        // Save advanced UI setting
+        advancedUI = document.getElementById('advanced-ui-toggle').checked;
+        localStorage.setItem('advancedUI', advancedUI.toString());
+        applyAdvancedUI();
+
         closeSettings();
         loadGoogleMaps();
+    }
+
+    function applyAdvancedUI() {
+        // Show/hide the stop number cycling (handled in click handler)
+        // Show/hide map filter row
+        const filterRow = document.getElementById('map-filter-row');
+        if (filterRow && !advancedUI) {
+            filterRow.classList.add('hidden');
+        }
+        // Reset stop types if advanced UI is turned off
+        if (!advancedUI) {
+            stops.forEach(s => { s.type = 'none'; });
+            stopsContainer.querySelectorAll('.stop-number').forEach(el => {
+                el.classList.remove('stop-num-bus', 'stop-num-res');
+            });
+            stopsContainer.querySelectorAll('.input-row').forEach(el => {
+                el.classList.remove('row-bus', 'row-res');
+            });
+        }
     }
 
     // Load Google Maps API
@@ -1188,7 +1216,7 @@
         `;
         routeSummary.classList.remove('hidden');
         resultActions.classList.remove('hidden');
-        if (mapFilterRow) mapFilterRow.classList.remove('hidden');
+        if (mapFilterRow && advancedUI) mapFilterRow.classList.remove('hidden');
 
         // Toggle breakdown on click
         routeSummary.onclick = () => {
