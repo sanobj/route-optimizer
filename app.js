@@ -86,8 +86,7 @@
             <button class="pin-btn" aria-label="Pin this stop" data-id="${stopId}" title="Pin to keep position">🔓</button>
             <span class="stop-number">${index + 1}</span>
             <input type="text" class="stop-input" placeholder="Enter destination address" autocomplete="new-password" data-id="${stopId}">
-            <button class="move-up-btn" aria-label="Move up" data-id="${stopId}">▲</button>
-            <button class="move-down-btn" aria-label="Move down" data-id="${stopId}">▼</button>
+            <span class="drag-handle" data-id="${stopId}">☰</span>
             <button class="remove-btn" aria-label="Remove stop" data-id="${stopId}">✕</button>
         `;
 
@@ -97,8 +96,6 @@
         const input = stopEl.querySelector('.stop-input');
         const removeBtn = stopEl.querySelector('.remove-btn');
         const pinBtn = stopEl.querySelector('.pin-btn');
-        const moveUpBtn = stopEl.querySelector('.move-up-btn');
-        const moveDownBtn = stopEl.querySelector('.move-down-btn');
 
         input.addEventListener('input', (e) => {
             const stop = stops.find(s => s.id === stopId);
@@ -108,8 +105,6 @@
 
         removeBtn.addEventListener('click', () => removeStop(stopId));
         pinBtn.addEventListener('click', () => togglePin(stopId));
-        moveUpBtn.addEventListener('click', () => moveStop(stopId, -1));
-        moveDownBtn.addEventListener('click', () => moveStop(stopId, 1));
         updateOptimizeButton();
     }
 
@@ -360,6 +355,77 @@
         });
     });
     observer.observe(stopsContainer, { childList: true });
+
+    // ===== TOUCH DRAG TO REORDER =====
+    let dragState = null;
+
+    stopsContainer.addEventListener('touchstart', (e) => {
+        const handle = e.target.closest('.drag-handle');
+        if (!handle) return;
+
+        e.preventDefault();
+        const row = handle.closest('.input-row');
+        if (!row) return;
+
+        const rect = row.getBoundingClientRect();
+        const touch = e.touches[0];
+
+        dragState = {
+            row: row,
+            id: parseInt(row.dataset.id) || parseFloat(row.dataset.id),
+            startY: touch.clientY,
+            offsetY: touch.clientY - rect.top,
+            rowHeight: rect.height,
+        };
+
+        row.classList.add('dragging');
+        row.style.zIndex = '100';
+    }, { passive: false });
+
+    stopsContainer.addEventListener('touchmove', (e) => {
+        if (!dragState) return;
+        e.preventDefault();
+
+        const touch = e.touches[0];
+        const rows = Array.from(stopsContainer.querySelectorAll('.input-row'));
+        const currentIndex = rows.indexOf(dragState.row);
+
+        // Determine which row we're hovering over
+        for (let i = 0; i < rows.length; i++) {
+            if (i === currentIndex) continue;
+            const rect = rows[i].getBoundingClientRect();
+            const midY = rect.top + rect.height / 2;
+
+            if (i < currentIndex && touch.clientY < midY) {
+                // Move up
+                stopsContainer.insertBefore(dragState.row, rows[i]);
+                swapStops(currentIndex, i);
+                break;
+            } else if (i > currentIndex && touch.clientY > midY) {
+                // Move down
+                if (rows[i].nextSibling) {
+                    stopsContainer.insertBefore(dragState.row, rows[i].nextSibling);
+                } else {
+                    stopsContainer.appendChild(dragState.row);
+                }
+                swapStops(currentIndex, i);
+                break;
+            }
+        }
+    }, { passive: false });
+
+    stopsContainer.addEventListener('touchend', () => {
+        if (!dragState) return;
+        dragState.row.classList.remove('dragging');
+        dragState.row.style.zIndex = '';
+        dragState = null;
+        renumberStops();
+    });
+
+    function swapStops(fromIndex, toIndex) {
+        const item = stops.splice(fromIndex, 1)[0];
+        stops.splice(toIndex, 0, item);
+    }
 
     // Route Optimization
     async function optimizeRoute() {
@@ -725,8 +791,7 @@
                 <button class="pin-btn" aria-label="Pin this stop" data-id="${stop.id}" title="${stop.pinned ? 'Unpin to allow optimization' : 'Pin to keep position'}">${stop.pinned ? '📌' : '🔓'}</button>
                 <span class="stop-number">${index + 1}</span>
                 <input type="text" class="stop-input" placeholder="Enter destination address" autocomplete="new-password" data-id="${stop.id}" value="${stop.address}">
-                <button class="move-up-btn" aria-label="Move up" data-id="${stop.id}">▲</button>
-                <button class="move-down-btn" aria-label="Move down" data-id="${stop.id}">▼</button>
+                <span class="drag-handle" data-id="${stop.id}">☰</span>
                 <button class="remove-btn" aria-label="Remove stop" data-id="${stop.id}">✕</button>
             `;
             stopsContainer.appendChild(stopEl);
@@ -734,8 +799,6 @@
             const input = stopEl.querySelector('.stop-input');
             const removeBtn = stopEl.querySelector('.remove-btn');
             const pinBtn = stopEl.querySelector('.pin-btn');
-            const moveUpBtn = stopEl.querySelector('.move-up-btn');
-            const moveDownBtn = stopEl.querySelector('.move-down-btn');
 
             input.addEventListener('input', (e) => {
                 const s = stops.find(st => st.id === stop.id);
@@ -745,8 +808,6 @@
 
             removeBtn.addEventListener('click', () => removeStop(stop.id));
             pinBtn.addEventListener('click', () => togglePin(stop.id));
-            moveUpBtn.addEventListener('click', () => moveStop(stop.id, -1));
-            moveDownBtn.addEventListener('click', () => moveStop(stop.id, 1));
 
             if (window.google && google.maps.places) {
                 enableAutocomplete(input);
@@ -1023,8 +1084,7 @@
                 <button class="pin-btn" aria-label="Pin this stop" data-id="${stopId}" title="Pin to keep position">🔓</button>
                 <span class="stop-number">${index + 1}</span>
                 <input type="text" class="stop-input" placeholder="Enter destination address" autocomplete="new-password" data-id="${stopId}" value="${address}">
-                <button class="move-up-btn" aria-label="Move up" data-id="${stopId}">▲</button>
-                <button class="move-down-btn" aria-label="Move down" data-id="${stopId}">▼</button>
+                <span class="drag-handle" data-id="${stopId}">☰</span>
                 <button class="remove-btn" aria-label="Remove stop" data-id="${stopId}">✕</button>
             `;
 
@@ -1033,8 +1093,6 @@
             const input = stopEl.querySelector('.stop-input');
             const removeBtn = stopEl.querySelector('.remove-btn');
             const pinBtn = stopEl.querySelector('.pin-btn');
-            const moveUpBtn = stopEl.querySelector('.move-up-btn');
-            const moveDownBtn = stopEl.querySelector('.move-down-btn');
 
             input.addEventListener('input', (e) => {
                 const stop = stops.find(s => s.id === stopId);
@@ -1044,8 +1102,6 @@
 
             removeBtn.addEventListener('click', () => removeStop(stopId));
             pinBtn.addEventListener('click', () => togglePin(stopId));
-            moveUpBtn.addEventListener('click', () => moveStop(stopId, -1));
-            moveDownBtn.addEventListener('click', () => moveStop(stopId, 1));
 
             // Enable autocomplete on the new input
             if (window.google && google.maps.places) {
@@ -1210,8 +1266,7 @@
                 <button class="pin-btn" aria-label="Pin this stop" data-id="${stopId}" title="${pinned ? 'Unpin to allow optimization' : 'Pin to keep position'}">${pinned ? '📌' : '🔓'}</button>
                 <span class="stop-number">${index + 1}</span>
                 <input type="text" class="stop-input" placeholder="Enter destination address" autocomplete="new-password" data-id="${stopId}" value="${address}">
-                <button class="move-up-btn" aria-label="Move up" data-id="${stopId}">▲</button>
-                <button class="move-down-btn" aria-label="Move down" data-id="${stopId}">▼</button>
+                <span class="drag-handle" data-id="${stopId}">☰</span>
                 <button class="remove-btn" aria-label="Remove stop" data-id="${stopId}">✕</button>
             `;
             stopsContainer.appendChild(stopEl);
@@ -1219,8 +1274,6 @@
             const input = stopEl.querySelector('.stop-input');
             const removeBtn = stopEl.querySelector('.remove-btn');
             const pinBtn = stopEl.querySelector('.pin-btn');
-            const moveUpBtn = stopEl.querySelector('.move-up-btn');
-            const moveDownBtn = stopEl.querySelector('.move-down-btn');
 
             input.addEventListener('input', (e) => {
                 const s = stops.find(st => st.id === stopId);
@@ -1230,8 +1283,6 @@
 
             removeBtn.addEventListener('click', () => removeStop(stopId));
             pinBtn.addEventListener('click', () => togglePin(stopId));
-            moveUpBtn.addEventListener('click', () => moveStop(stopId, -1));
-            moveDownBtn.addEventListener('click', () => moveStop(stopId, 1));
 
             if (window.google && google.maps.places) {
                 enableAutocomplete(input);

@@ -657,22 +657,29 @@ body {
     background: rgba(0,0,0,0.05);
 }
 
-.move-up-btn,
-.move-down-btn {
-    background: none;
-    border: none;
-    font-size: 0.7rem;
-    cursor: pointer;
-    padding: 4px;
-    border-radius: 4px;
+/* Drag Handle */
+.drag-handle {
+    font-size: 1.1rem;
+    cursor: grab;
+    padding: 4px 8px;
     color: var(--text-secondary);
     flex-shrink: 0;
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: none;
 }
 
-.move-up-btn:hover,
-.move-down-btn:hover {
-    background: rgba(0,0,0,0.05);
-    color: var(--text);
+.drag-handle:active {
+    cursor: grabbing;
+    color: var(--primary);
+}
+
+/* Dragging state */
+.input-row.dragging {
+    background: rgba(26, 115, 232, 0.08);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    border-radius: 8px;
+    opacity: 0.9;
 }
 
 .remove-btn {
