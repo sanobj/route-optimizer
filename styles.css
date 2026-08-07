@@ -875,6 +875,42 @@ body {
     background: rgba(128,128,128,0.15);
 }
 
+/* Swipe to Delete */
+.start-location,
+.end-location,
+#stops-container .input-row {
+    position: relative;
+}
+
+.swipe-delete-bg {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 120px;
+    background: var(--danger);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 0.85rem;
+    border-radius: 8px;
+    z-index: 0;
+}
+
+.input-row {
+    position: relative;
+    z-index: 1;
+    background: var(--surface);
+}
+
+/* Hide X buttons when Advanced UI is on */
+[data-advanced-ui="true"] .remove-btn,
+[data-advanced-ui="true"] .input-clear-btn {
+    display: none;
+}
+
 /* Drag Handle */
 .drag-handle {
     font-size: 1.1rem;

@@ -12,6 +12,7 @@
 
     // Apply theme immediately to prevent flash
     if (darkMode) document.documentElement.setAttribute('data-theme', 'dark');
+    if (advancedUI) document.documentElement.setAttribute('data-advanced-ui', 'true');
 
     // DOM Elements
     const startInput = document.getElementById('start-input');
@@ -395,6 +396,12 @@
     }
 
     function applyAdvancedUI() {
+        // Set/remove data attribute for CSS
+        if (advancedUI) {
+            document.documentElement.setAttribute('data-advanced-ui', 'true');
+        } else {
+            document.documentElement.removeAttribute('data-advanced-ui');
+        }
         // Show/hide the stop number cycling (handled in click handler)
         // Show/hide map filter row
         const filterRow = document.getElementById('map-filter-row');
@@ -695,6 +702,113 @@
         document.addEventListener('mousemove', onMouseMove);
         document.addEventListener('mouseup', onMouseUp);
     });
+
+    // ===== SWIPE TO DELETE (Advanced UI) =====
+    let swipeState = null;
+
+    function initSwipeDelete(container) {
+        container.addEventListener('touchstart', (e) => {
+            if (!advancedUI) return;
+            if (dragReady || dragState) return; // Don't interfere with drag-to-reorder
+            if (e.target.closest('.drag-handle') || e.target.closest('.pin-btn')) return;
+
+            const row = e.target.closest('.input-row');
+            if (!row) return;
+
+            const touch = e.touches[0];
+            swipeState = {
+                row: row,
+                startX: touch.clientX,
+                startY: touch.clientY,
+                currentX: 0,
+                swiping: false,
+            };
+        }, { passive: true });
+
+        container.addEventListener('touchmove', (e) => {
+            if (!swipeState) return;
+            if (dragReady || dragState) { swipeState = null; return; }
+
+            const touch = e.touches[0];
+            const dx = touch.clientX - swipeState.startX;
+            const dy = touch.clientY - swipeState.startY;
+
+            // If vertical movement is greater, it's a scroll — cancel swipe
+            if (!swipeState.swiping && Math.abs(dy) > Math.abs(dx)) {
+                swipeState = null;
+                return;
+            }
+
+            // Only swipe left (negative dx)
+            if (dx < -10) {
+                swipeState.swiping = true;
+                e.preventDefault();
+                swipeState.currentX = Math.max(dx, -120);
+                swipeState.row.style.transform = `translateX(${swipeState.currentX}px)`;
+                swipeState.row.style.transition = 'none';
+
+                // Show/update delete background
+                let bg = swipeState.row.parentElement.querySelector('.swipe-delete-bg');
+                if (!bg) {
+                    bg = document.createElement('div');
+                    bg.className = 'swipe-delete-bg';
+                    bg.textContent = 'Delete';
+                    swipeState.row.parentElement.insertBefore(bg, swipeState.row);
+                    bg.style.height = swipeState.row.offsetHeight + 'px';
+                }
+            }
+        }, { passive: false });
+
+        container.addEventListener('touchend', () => {
+            if (!swipeState) return;
+            const { row, currentX, swiping } = swipeState;
+            swipeState = null;
+
+            if (!swiping) return;
+
+            if (currentX < -80) {
+                // Threshold met — delete
+                row.style.transition = 'transform 0.2s ease';
+                row.style.transform = 'translateX(-100%)';
+                setTimeout(() => {
+                    // Remove the delete background
+                    const bg = row.parentElement?.querySelector('.swipe-delete-bg');
+                    if (bg) bg.remove();
+
+                    // Determine what to delete
+                    const id = Number(row.dataset.id);
+                    if (id) {
+                        removeStop(id);
+                    } else if (row.querySelector('#start-input')) {
+                        startInput.value = '';
+                        updateOptimizeButton();
+                    } else if (row.querySelector('#end-input')) {
+                        endInput.value = '';
+                        updateOptimizeButton();
+                    }
+                    row.style.transform = '';
+                    row.style.transition = '';
+                }, 200);
+            } else {
+                // Snap back
+                row.style.transition = 'transform 0.2s ease';
+                row.style.transform = 'translateX(0)';
+                setTimeout(() => {
+                    row.style.transform = '';
+                    row.style.transition = '';
+                    const bg = row.parentElement?.querySelector('.swipe-delete-bg');
+                    if (bg) bg.remove();
+                }, 200);
+            }
+        });
+    }
+
+    // Init swipe on stops container
+    initSwipeDelete(stopsContainer);
+
+    // Init swipe on start/end location containers
+    initSwipeDelete(document.querySelector('.start-location'));
+    initSwipeDelete(document.querySelector('.end-location'));
 
     // Route Optimization
     async function optimizeRoute() {
