@@ -1540,7 +1540,7 @@
             stops.push({ id: stopId, address: address, pinned: pinned, type: type });
 
             const stopEl = document.createElement('div');
-            stopEl.className = 'input-row' + (pinned ? ' pinned' : '');
+            stopEl.className = 'input-row' + (pinned ? ' pinned' : '') + (advancedUI ? (type === 'bus' ? ' row-bus' : type === 'res' ? ' row-res' : ' row-default') : '');
             stopEl.dataset.id = stopId;
             const numClass = type === 'bus' ? 'stop-num-bus' : type === 'res' ? 'stop-num-res' : '';
             stopEl.innerHTML = `
@@ -1738,7 +1738,7 @@
             stops.push({ id: stopId, address: address, pinned: pinned, type: type });
 
             const stopEl = document.createElement('div');
-            stopEl.className = 'input-row' + (pinned ? ' pinned' : '');
+            stopEl.className = 'input-row' + (pinned ? ' pinned' : '') + (advancedUI ? (type === 'bus' ? ' row-bus' : type === 'res' ? ' row-res' : ' row-default') : '');
             stopEl.dataset.id = stopId;
             const numClass = type === 'bus' ? 'stop-num-bus' : type === 'res' ? 'stop-num-res' : '';
             stopEl.innerHTML = `
