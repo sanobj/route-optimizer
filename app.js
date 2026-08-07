@@ -644,17 +644,13 @@
 
         if (address) {
             const infoWindow = new google.maps.InfoWindow({
-                content: `<div style="font-size:13px;font-weight:500;padding:8px;">${address}</div>`,
-                maxWidth: 250,
-                headerDisabled: true,
+                content: `<div style="font-size:13px;font-weight:500;">${address}</div>`,
+                maxWidth: 220,
             });
             marker.addListener('click', () => {
                 if (window._openInfoWindow) window._openInfoWindow.close();
                 infoWindow.open(map, marker);
                 window._openInfoWindow = infoWindow;
-            });
-            google.maps.event.addListener(map, 'click', () => {
-                infoWindow.close();
             });
         }
 
