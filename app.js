@@ -106,6 +106,9 @@
         removeBtn.addEventListener('click', () => removeStop(stopId));
         pinBtn.addEventListener('click', () => togglePin(stopId));
         updateOptimizeButton();
+
+        // Auto-focus the new input
+        input.focus();
     }
 
     function togglePin(id) {
