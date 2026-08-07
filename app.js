@@ -644,9 +644,22 @@
 
         if (address) {
             const infoWindow = new google.maps.InfoWindow({
-                content: `<div style="font-size:13px;font-weight:500;padding:0;margin:0;">${address}</div>`,
+                content: `<div style="font-size:13px;font-weight:500;padding:4px 0;margin:0;">${address}</div>`,
                 maxWidth: 250,
                 disableAutoPan: false,
+            });
+            infoWindow.addListener('domready', () => {
+                // Strip whitespace from Google's InfoWindow wrapper
+                const iwOuter = document.querySelector('.gm-style-iw-c');
+                if (iwOuter) iwOuter.style.padding = '0';
+                const iwInner = document.querySelector('.gm-style-iw-d');
+                if (iwInner) {
+                    iwInner.style.overflow = 'hidden';
+                    iwInner.style.padding = '8px';
+                }
+                // Remove the top white bar area
+                const iwBackground = iwOuter ? iwOuter.previousElementSibling : null;
+                if (iwBackground) iwBackground.style.display = 'none';
             });
             marker.addListener('click', () => {
                 if (window._openInfoWindow) window._openInfoWindow.close();
