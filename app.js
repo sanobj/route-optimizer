@@ -274,6 +274,7 @@
             zoom: 4,
             disableDefaultUI: true,
             zoomControl: true,
+            gestureHandling: 'greedy',
         });
         directionsRenderer = new google.maps.DirectionsRenderer({
             map: map,
