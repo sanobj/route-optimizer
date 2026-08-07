@@ -878,8 +878,22 @@
     // ===== SAVED ROUTES =====
     const saveRouteBtn = document.getElementById('save-route-btn');
     const savedRoutesList = document.getElementById('saved-routes-list');
+    const savedRoutesBtn = document.getElementById('saved-routes-btn');
+    const savedRoutesModal = document.getElementById('saved-routes-modal');
+    const closeSavedRoutesBtn = document.getElementById('close-saved-routes-btn');
 
     saveRouteBtn.addEventListener('click', saveCurrentRoute);
+    savedRoutesBtn.addEventListener('click', openSavedRoutes);
+    closeSavedRoutesBtn.addEventListener('click', closeSavedRoutes);
+
+    function openSavedRoutes() {
+        renderSavedRoutes();
+        savedRoutesModal.classList.remove('hidden');
+    }
+
+    function closeSavedRoutes() {
+        savedRoutesModal.classList.add('hidden');
+    }
 
     function getSavedRoutes() {
         const data = localStorage.getItem('savedRoutes');
@@ -992,6 +1006,7 @@
         });
 
         updateOptimizeButton();
+        closeSavedRoutes();
 
         // Scroll to top
         window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -1028,9 +1043,6 @@
     // Expose to onclick handlers
     window._loadRoute = loadRoute;
     window._deleteRoute = deleteRoute;
-
-    // Render saved routes on load
-    renderSavedRoutes();
 
     // ===== ROUTE HISTORY =====
     function getHistory() {

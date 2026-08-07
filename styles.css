@@ -497,31 +497,14 @@ body {
     background: rgba(26, 115, 232, 0.05);
 }
 
-/* Saved Routes Section */
-.saved-routes-section {
-    margin-top: 24px;
-    background: var(--surface);
-    border-radius: var(--radius);
-    padding: 16px;
-    box-shadow: var(--shadow);
-}
-
-.saved-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 12px;
-}
-
-.saved-header h2 {
-    font-size: 1.1rem;
-    color: var(--text);
-}
-
+/* Saved Routes */
 .saved-routes-list {
     display: flex;
     flex-direction: column;
     gap: 8px;
+    flex: 1;
+    overflow-y: auto;
+    margin: 12px 0;
 }
 
 .empty-state {

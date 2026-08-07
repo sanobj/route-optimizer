@@ -18,6 +18,7 @@
         <header class="header">
             <h1>Route Optimizer</h1>
             <div class="header-actions">
+                <button id="saved-routes-btn" class="icon-btn" aria-label="Saved Routes">📁</button>
                 <button id="history-btn" class="icon-btn" aria-label="Route History">🕘</button>
                 <button id="settings-btn" class="icon-btn" aria-label="Settings">⚙️</button>
             </div>
@@ -36,6 +37,19 @@
                 </div>
                 <div class="modal-actions">
                     <button id="clear-history-btn" class="btn btn-secondary">Clear All History</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Saved Routes Modal -->
+        <div id="saved-routes-modal" class="modal hidden">
+            <div class="modal-content modal-large">
+                <div class="modal-header">
+                    <h2>Saved Routes</h2>
+                    <button id="close-saved-routes-btn" class="icon-btn" aria-label="Close">✕</button>
+                </div>
+                <div id="saved-routes-list" class="saved-routes-list">
+                    <p class="empty-state">No saved routes yet</p>
                 </div>
             </div>
         </div>
@@ -97,16 +111,6 @@
 
         <!-- Map Section -->
         <div id="map" class="map-container"></div>
-
-        <!-- Saved Routes Section -->
-        <section id="saved-routes-section" class="saved-routes-section">
-            <div class="saved-header">
-                <h2>Saved Routes</h2>
-            </div>
-            <div id="saved-routes-list" class="saved-routes-list">
-                <p class="empty-state">No saved routes yet</p>
-            </div>
-        </section>
     </div>
 
     <script src="app.js"></script>
