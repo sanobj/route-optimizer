@@ -592,6 +592,14 @@ body {
     background: var(--danger);
 }
 
+.breakdown-label.breakdown-bus {
+    background: #ff8c00;
+}
+
+.breakdown-label.breakdown-res {
+    background: #9c27b0;
+}
+
 .breakdown-arrow {
     font-size: 0.75rem;
     color: var(--primary);

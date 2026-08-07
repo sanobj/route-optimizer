@@ -1331,7 +1331,13 @@
             breakdownHtml += `<div class="breakdown-arrow">↓ ${leg.distance.text} · ${leg.duration.text}</div>`;
             const isLast = i === legs.length - 1;
             const label = isLast ? 'End' : `${i + 1}`;
-            const cls = isLast ? 'breakdown-end' : '';
+            let cls = isLast ? 'breakdown-end' : '';
+            // Add bus/res color to label when Advanced UI is on
+            if (!isLast && advancedUI) {
+                const stop = stops[i];
+                if (stop && stop.type === 'bus') cls = 'breakdown-bus';
+                else if (stop && stop.type === 'res') cls = 'breakdown-res';
+            }
             breakdownHtml += `<div class="breakdown-stop"><span class="breakdown-label ${cls}">${label}</span> ${leg.end_address}</div>`;
         });
         breakdownHtml += '</div>';
