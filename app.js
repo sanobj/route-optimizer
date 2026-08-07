@@ -1125,7 +1125,7 @@
         // If this would overwrite, make that clear in the prompt
         let promptMsg = 'Name this route:';
         if (existingWithDefault !== -1 && currentLoadedRouteName) {
-            promptMsg = `Save will overwrite "${defaultName}". Change name to save as new:`;
+            promptMsg = 'Keeping the same name will overwrite the existing save.\nRename to save as new.';
         }
 
         const name = prompt(promptMsg, defaultName);
