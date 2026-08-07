@@ -487,6 +487,10 @@ body {
     gap: 6px;
 }
 
+.settings-info p.indent {
+    padding-left: 18px;
+}
+
 .info-dot {
     width: 12px;
     height: 12px;
