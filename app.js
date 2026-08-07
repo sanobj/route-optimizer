@@ -83,7 +83,7 @@
     function addStop() {
         const index = stops.length;
         const stopId = Date.now() + index;
-        stops.push({ id: stopId, address: '', pinned: false });
+        stops.push({ id: stopId, address: '', pinned: false, type: 'none' });
 
         const stopEl = document.createElement('div');
         stopEl.className = 'input-row';
@@ -91,6 +91,7 @@
         stopEl.innerHTML = `
             <button class="pin-btn" aria-label="Pin this stop" data-id="${stopId}" title="Pin to keep position">🔓</button>
             <span class="stop-number">${index + 1}</span>
+            <span class="stop-type-badge" data-id="${stopId}"></span>
             <input type="text" class="stop-input" placeholder="Enter destination address" autocomplete="new-password" data-id="${stopId}">
             <span class="drag-handle" data-id="${stopId}">☰</span>
             <button class="remove-btn" aria-label="Remove stop" data-id="${stopId}">✕</button>
@@ -189,7 +190,7 @@
             saveToHistory({
                 origin: origin || '(none)',
                 destination: destination || '(none)',
-                stops: filledStops.map(s => ({ address: s.address, pinned: s.pinned })),
+                stops: filledStops.map(s => ({ address: s.address, pinned: s.pinned, type: s.type })),
                 totalTime: '-',
                 totalDistance: '-',
                 timestamp: Date.now(),
@@ -228,6 +229,66 @@
         currentLoadedRouteName = null;
         updateOptimizeButton();
     }
+
+    // ===== BUS/RES TAGGING MODE =====
+    let tagMode = null; // null, 'bus', or 'res'
+    const tagBusBtn = document.getElementById('tag-bus-btn');
+    const tagResBtn = document.getElementById('tag-res-btn');
+
+    tagBusBtn.addEventListener('click', () => {
+        if (tagMode === 'bus') {
+            tagMode = null;
+            tagBusBtn.classList.remove('active');
+        } else {
+            tagMode = 'bus';
+            tagBusBtn.classList.add('active');
+            tagResBtn.classList.remove('active');
+        }
+    });
+
+    tagResBtn.addEventListener('click', () => {
+        if (tagMode === 'res') {
+            tagMode = null;
+            tagResBtn.classList.remove('active');
+        } else {
+            tagMode = 'res';
+            tagResBtn.classList.add('active');
+            tagBusBtn.classList.remove('active');
+        }
+    });
+
+    // When in tag mode, clicking a stop row tags it
+    stopsContainer.addEventListener('click', (e) => {
+        if (!tagMode) return;
+        // Don't interfere with pin, remove, drag, or input
+        if (e.target.closest('.pin-btn') || e.target.closest('.remove-btn') || e.target.closest('.drag-handle') || e.target.closest('.stop-input')) return;
+
+        const row = e.target.closest('.input-row');
+        if (!row) return;
+
+        const id = parseInt(row.dataset.id) || parseFloat(row.dataset.id);
+        const stop = stops.find(s => s.id === id);
+        if (!stop) return;
+
+        // Toggle: if already this type, remove it; otherwise set it
+        if (stop.type === tagMode) {
+            stop.type = 'none';
+        } else {
+            stop.type = tagMode;
+        }
+
+        // Update badge
+        const badge = row.querySelector('.stop-type-badge');
+        if (badge) {
+            badge.className = 'stop-type-badge' + (stop.type === 'bus' ? ' badge-bus' : stop.type === 'res' ? ' badge-res' : '');
+            badge.textContent = stop.type === 'bus' ? 'B' : stop.type === 'res' ? 'R' : '';
+        }
+
+        // Update row styling
+        row.classList.remove('row-bus', 'row-res');
+        if (stop.type === 'bus') row.classList.add('row-bus');
+        if (stop.type === 'res') row.classList.add('row-res');
+    });
 
     // GPS
     function getCurrentLocation() {
@@ -603,44 +664,69 @@
         // Separate pinned and unpinned stops
         const pinnedStops = filledStops.filter(s => s.pinned);
 
+        // Pre-sort: reorder unpinned stops so businesses come before residences
+        // Pinned stops stay in their exact positions
+        const sortedFilledStops = [];
+        const unpinnedBus = filledStops.filter(s => !s.pinned && s.type === 'bus');
+        const unpinnedRes = filledStops.filter(s => !s.pinned && s.type === 'res');
+        const unpinnedNone = filledStops.filter(s => !s.pinned && s.type === 'none');
+        const unpinnedSorted = [...unpinnedBus, ...unpinnedNone, ...unpinnedRes];
+
+        let unpinnedIdx = 0;
+        for (let i = 0; i < filledStops.length; i++) {
+            if (filledStops[i].pinned) {
+                sortedFilledStops.push(filledStops[i]);
+            } else {
+                sortedFilledStops.push(unpinnedSorted[unpinnedIdx++]);
+            }
+        }
+
+        // Use sortedFilledStops for optimization
+        const stopsForOptimize = sortedFilledStops;
+
         if (destination === null) {
             // No end mode: use last waypoint as destination, optimize the rest
-            if (filledStops.length === 1) {
-                runDirections(origin, filledStops[0].address.trim(), [], false);
+            if (stopsForOptimize.length === 1) {
+                runDirections(origin, stopsForOptimize[0].address.trim(), [], false);
             } else {
-                const allAddresses = filledStops.map(s => s.address.trim());
+                const allAddresses = stopsForOptimize.map(s => s.address.trim());
                 const dest = allAddresses[allAddresses.length - 1];
                 const waypoints = allAddresses.slice(0, -1);
 
                 if (pinnedStops.length === 0) {
-                    runDirections(origin, dest, waypoints, true);
+                    // Optimize bus stops and res stops separately to keep bus first
+                    const hasMixedTypes = unpinnedBus.length > 0 && (unpinnedRes.length > 0 || unpinnedNone.length > 0);
+                    if (hasMixedTypes) {
+                        optimizeWithPinnedStops(origin, dest, stopsForOptimize);
+                    } else {
+                        runDirections(origin, dest, waypoints, true);
+                    }
                 } else {
-                    optimizeWithPinnedStops(origin, dest, filledStops);
+                    optimizeWithPinnedStops(origin, dest, stopsForOptimize);
                 }
             }
         } else {
             // Have a fixed destination (round-trip or address)
             if (pinnedStops.length === 0) {
-                runDirections(origin, destination, filledStops.map(s => s.address.trim()), true);
+                const hasMixedTypes = unpinnedBus.length > 0 && (unpinnedRes.length > 0 || unpinnedNone.length > 0);
+                if (hasMixedTypes) {
+                    optimizeWithPinnedStops(origin, destination, stopsForOptimize);
+                } else {
+                    runDirections(origin, destination, stopsForOptimize.map(s => s.address.trim()), true);
+                }
             } else {
-                optimizeWithPinnedStops(origin, destination, filledStops);
+                optimizeWithPinnedStops(origin, destination, stopsForOptimize);
+            }
             }
         }
     }
 
     function optimizeWithPinnedStops(origin, destination, filledStops) {
-        // Strategy: Send all waypoints but DON'T optimize.
-        // Instead, we manually figure out the best order:
-        // 1. Pinned stops stay in their exact positions
-        // 2. Unpinned stops between pinned stops get optimized within those segments
+        // Strategy: Split into segments at pinned stops AND at bus/res type boundaries.
+        // Each segment is optimized independently by Google.
+        // This ensures businesses are routed before residences.
 
-        // First, identify segments between pinned stops
-        // A segment is a group of unpinned stops between two fixed points
         const allAddresses = filledStops.map(s => s.address.trim());
-        const pinnedIndices = filledStops.reduce((acc, s, i) => {
-            if (s.pinned) acc.push(i);
-            return acc;
-        }, []);
         const unpinnedIndices = filledStops.reduce((acc, s, i) => {
             if (!s.pinned) acc.push(i);
             return acc;
@@ -652,29 +738,21 @@
             return;
         }
 
-        // For the optimization: we keep pinned stops in order and let Google
-        // optimize the unpinned ones around them.
-        // We build waypoints array preserving pinned order.
-        // Google's optimizeWaypoints will reorder ALL waypoints, which we don't want.
-        // So we make multiple segment calls or use a single call without optimization
-        // but with our own ordering logic.
-
-        // Simpler approach: Use a single Directions call.
-        // Mark pinned waypoints as NOT optimizable by splitting into legs.
-        // Actually, the simplest correct approach:
-        // Build segments between fixed points, optimize each segment independently.
-
+        // Build segments: split at pinned stops and at type boundaries
         const segments = [];
         let segStart = origin;
         let currentUnpinned = [];
+        let currentType = null;
 
         for (let i = 0; i < filledStops.length; i++) {
-            if (filledStops[i].pinned) {
-                // End current segment
+            const stop = filledStops[i];
+
+            if (stop.pinned) {
+                // End current segment at this pinned stop
                 if (currentUnpinned.length > 0) {
                     segments.push({
                         origin: segStart,
-                        destination: filledStops[i].address.trim(),
+                        destination: stop.address.trim(),
                         waypoints: currentUnpinned.slice(),
                         optimize: true,
                     });
@@ -682,14 +760,37 @@
                 } else {
                     segments.push({
                         origin: segStart,
-                        destination: filledStops[i].address.trim(),
+                        destination: stop.address.trim(),
                         waypoints: [],
                         optimize: false,
                     });
                 }
-                segStart = filledStops[i].address.trim();
+                segStart = stop.address.trim();
+                currentType = null;
             } else {
-                currentUnpinned.push(filledStops[i].address.trim());
+                // Check for type boundary (bus -> non-bus or non-bus -> bus)
+                const stopType = stop.type || 'none';
+                const effectiveType = stopType === 'bus' ? 'bus' : 'other';
+
+                if (currentType !== null && effectiveType !== currentType && currentUnpinned.length > 0) {
+                    // Type boundary — end current segment, start new one
+                    // Use this stop's address as the destination of the segment? No — 
+                    // we need a midpoint. Use the last unpinned as a virtual endpoint.
+                    // Actually, better: just end the segment without a fixed endpoint
+                    // by making the last waypoint the segment destination.
+                    const lastWaypoint = currentUnpinned.pop();
+                    segments.push({
+                        origin: segStart,
+                        destination: lastWaypoint,
+                        waypoints: currentUnpinned.slice(),
+                        optimize: true,
+                    });
+                    segStart = lastWaypoint;
+                    currentUnpinned = [stop.address.trim()];
+                } else {
+                    currentUnpinned.push(stop.address.trim());
+                }
+                currentType = effectiveType;
             }
         }
 
@@ -927,6 +1028,7 @@
             stopEl.innerHTML = `
                 <button class="pin-btn" aria-label="Pin this stop" data-id="${stop.id}" title="${stop.pinned ? 'Unpin to allow optimization' : 'Pin to keep position'}">${stop.pinned ? '📌' : '🔓'}</button>
                 <span class="stop-number">${index + 1}</span>
+                <span class="stop-type-badge ${stop.type === 'bus' ? 'badge-bus' : stop.type === 'res' ? 'badge-res' : ''}" data-id="${stop.id}">${stop.type === 'bus' ? 'B' : stop.type === 'res' ? 'R' : ''}</span>
                 <input type="text" class="stop-input" placeholder="Enter destination address" autocomplete="new-password" data-id="${stop.id}" value="${stop.address}">
                 <span class="drag-handle" data-id="${stop.id}">☰</span>
                 <button class="remove-btn" aria-label="Remove stop" data-id="${stop.id}">✕</button>
@@ -1004,11 +1106,24 @@
         // Start marker (green)
         addCustomMarker(legs[0].start_location, '📍', 'Start');
 
-        // Intermediate stops (numbered)
+        // Intermediate stops (numbered) — color by type
         legs.forEach((leg, i) => {
             const isLast = i === legs.length - 1;
             const label = isLast ? '●' : String(i + 1);
-            const color = isLast ? '#ea4335' : '#1a73e8';
+            let color;
+            if (isLast) {
+                color = '#ea4335'; // red for end
+            } else {
+                // Match stop type by index in the reordered stops array
+                const stop = stops[i];
+                if (stop && stop.type === 'bus') {
+                    color = '#ff8c00'; // orange for business
+                } else if (stop && stop.type === 'res') {
+                    color = '#9c27b0'; // purple for residence
+                } else {
+                    color = '#1a73e8'; // blue default
+                }
+            }
             addNumberedMarker(leg.end_location, label, color, leg.end_address);
         });
 
@@ -1083,7 +1198,7 @@
         saveToHistory({
             origin: legs[0].start_address,
             destination: legs[legs.length - 1].end_address,
-            stops: filledStopsForHistory.map(s => ({ address: s.address, pinned: s.pinned })),
+            stops: filledStopsForHistory.map(s => ({ address: s.address, pinned: s.pinned, type: s.type })),
             totalTime: timeStr,
             totalDistance: distanceMiles + ' mi',
             timestamp: Date.now(),
@@ -1190,8 +1305,7 @@
             origin: origin,
             destination: destination,
             endMode: endMode,
-            stops: waypoints.map(s => s.address),
-            pinnedIndices: waypoints.reduce((acc, s, i) => { if (s.pinned) acc.push(i); return acc; }, []),
+            stops: waypoints.map(s => ({ address: s.address, pinned: s.pinned, type: s.type || 'none' })),
             createdAt: new Date().toLocaleDateString(),
         };
 
@@ -1235,17 +1349,23 @@
         }
 
         // Add saved stops
-        route.stops.forEach(address => {
+        route.stops.forEach((stopData, i) => {
+            const address = typeof stopData === 'string' ? stopData : stopData.address || stopData;
+            const type = (typeof stopData === 'object' && stopData.type) ? stopData.type : 'none';
+            const pinned = (typeof stopData === 'object' && stopData.pinned) ? true : (route.pinnedIndices ? route.pinnedIndices.includes(i) : false);
             const index = stops.length;
             const stopId = Date.now() + index + Math.random();
-            stops.push({ id: stopId, address: address, pinned: false });
+            stops.push({ id: stopId, address: address, pinned: pinned, type: type });
 
             const stopEl = document.createElement('div');
-            stopEl.className = 'input-row';
+            stopEl.className = 'input-row' + (pinned ? ' pinned' : '');
             stopEl.dataset.id = stopId;
+            const badgeClass = type === 'bus' ? 'badge-bus' : type === 'res' ? 'badge-res' : '';
+            const badgeText = type === 'bus' ? 'B' : type === 'res' ? 'R' : '';
             stopEl.innerHTML = `
-                <button class="pin-btn" aria-label="Pin this stop" data-id="${stopId}" title="Pin to keep position">🔓</button>
+                <button class="pin-btn" aria-label="Pin this stop" data-id="${stopId}" title="${pinned ? 'Unpin to allow optimization' : 'Pin to keep position'}">${pinned ? '📌' : '🔓'}</button>
                 <span class="stop-number">${index + 1}</span>
+                <span class="stop-type-badge ${badgeClass}" data-id="${stopId}">${badgeText}</span>
                 <input type="text" class="stop-input" placeholder="Enter destination address" autocomplete="new-password" data-id="${stopId}" value="${address}">
                 <span class="drag-handle" data-id="${stopId}">☰</span>
                 <button class="remove-btn" aria-label="Remove stop" data-id="${stopId}">✕</button>
@@ -1427,21 +1547,25 @@
             endInput.value = '';
         }
 
-        // Add stops (supports both old format [string] and new format [{address, pinned}])
+        // Add stops (supports both old format [string] and new format [{address, pinned, type}])
         const allStops = entry.stops || [];
         allStops.forEach(stopData => {
             const address = typeof stopData === 'string' ? stopData : stopData.address;
             const pinned = typeof stopData === 'string' ? false : !!stopData.pinned;
+            const type = (typeof stopData === 'object' && stopData.type) ? stopData.type : 'none';
             const index = stops.length;
             const stopId = Date.now() + index + Math.random();
-            stops.push({ id: stopId, address: address, pinned: pinned });
+            stops.push({ id: stopId, address: address, pinned: pinned, type: type });
 
             const stopEl = document.createElement('div');
             stopEl.className = 'input-row' + (pinned ? ' pinned' : '');
             stopEl.dataset.id = stopId;
+            const badgeClass = type === 'bus' ? 'badge-bus' : type === 'res' ? 'badge-res' : '';
+            const badgeText = type === 'bus' ? 'B' : type === 'res' ? 'R' : '';
             stopEl.innerHTML = `
                 <button class="pin-btn" aria-label="Pin this stop" data-id="${stopId}" title="${pinned ? 'Unpin to allow optimization' : 'Pin to keep position'}">${pinned ? '📌' : '🔓'}</button>
                 <span class="stop-number">${index + 1}</span>
+                <span class="stop-type-badge ${badgeClass}" data-id="${stopId}">${badgeText}</span>
                 <input type="text" class="stop-input" placeholder="Enter destination address" autocomplete="new-password" data-id="${stopId}" value="${address}">
                 <span class="drag-handle" data-id="${stopId}">☰</span>
                 <button class="remove-btn" aria-label="Remove stop" data-id="${stopId}">✕</button>
