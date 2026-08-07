@@ -1315,7 +1315,16 @@
     // ===== ROUTE HISTORY =====
     function getHistory() {
         const data = localStorage.getItem('routeHistory');
-        return data ? JSON.parse(data) : [];
+        if (!data) return [];
+        const history = JSON.parse(data);
+        // Expire entries older than 3 days
+        const threeDays = 3 * 24 * 60 * 60 * 1000;
+        const now = Date.now();
+        const filtered = history.filter(entry => (now - entry.timestamp) < threeDays);
+        if (filtered.length !== history.length) {
+            localStorage.setItem('routeHistory', JSON.stringify(filtered));
+        }
+        return filtered;
     }
 
     function setHistory(history) {
