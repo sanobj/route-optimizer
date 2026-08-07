@@ -265,11 +265,16 @@
     // When in tag mode, clicking a stop row tags it
     stopsContainer.addEventListener('click', (e) => {
         if (!tagMode) return;
-        // Don't interfere with pin, remove, drag, or input
-        if (e.target.closest('.pin-btn') || e.target.closest('.remove-btn') || e.target.closest('.drag-handle') || e.target.closest('.stop-input')) return;
+        // Don't interfere with pin, remove, or drag
+        if (e.target.closest('.pin-btn') || e.target.closest('.remove-btn') || e.target.closest('.drag-handle')) return;
 
         const row = e.target.closest('.input-row');
         if (!row) return;
+
+        // If tapping the input while in tag mode, prevent focus and tag instead
+        if (e.target.closest('.stop-input')) {
+            e.target.blur();
+        }
 
         const id = parseInt(row.dataset.id) || parseFloat(row.dataset.id);
         const stop = stops.find(s => s.id === id);
