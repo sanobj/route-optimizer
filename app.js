@@ -230,6 +230,7 @@
         // Hide summary and actions
         routeSummary.classList.add('hidden');
         resultActions.classList.add('hidden');
+        if (mapFilterRow) mapFilterRow.classList.add('hidden');
 
         // Clear map
         if (directionsRenderer) directionsRenderer.setDirections({ routes: [] });
@@ -1148,6 +1149,31 @@
         }
     };
 
+    // ===== MAP FILTER (Advanced UI) =====
+    const mapFilterRow = document.getElementById('map-filter-row');
+    if (mapFilterRow) {
+        mapFilterRow.querySelectorAll('.map-filter-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                mapFilterRow.querySelectorAll('.map-filter-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                applyMapFilter(btn.dataset.filter);
+            });
+        });
+    }
+
+    function applyMapFilter(filter) {
+        if (!window._routeMarkers) return;
+        window._routeMarkers.forEach(item => {
+            if (filter === 'all') {
+                item.marker.setVisible(true);
+            } else if (filter === 'bus') {
+                item.marker.setVisible(item.type === 'bus' || item.type === 'start');
+            } else if (filter === 'res') {
+                item.marker.setVisible(item.type === 'res' || item.type === 'start');
+            }
+        });
+    }
+
     function reorderStopsToMatch(orderedAddresses, excludeLast) {
         // Reorder the stops array and DOM to match the optimized route order
         // orderedAddresses is the list of waypoint addresses in optimized order
@@ -1363,6 +1389,7 @@
         `;
         routeSummary.classList.remove('hidden');
         resultActions.classList.remove('hidden');
+        if (mapFilterRow && advancedUI) mapFilterRow.classList.remove('hidden');
 
         // Toggle breakdown on click
         routeSummary.onclick = () => {
