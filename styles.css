@@ -96,6 +96,12 @@ body {
     gap: 6px;
 }
 
+.history-title {
+    font-weight: 700;
+    font-size: 0.9rem;
+    color: var(--text);
+}
+
 .history-route {
     display: flex;
     flex-direction: column;

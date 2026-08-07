@@ -1084,12 +1084,13 @@
 
         historyList.innerHTML = history.map((entry, idx) => {
             const date = new Date(entry.timestamp).toLocaleDateString(undefined, {
-                month: 'short', day: 'numeric', year: 'numeric',
+                weekday: 'short', month: 'short', day: 'numeric', year: 'numeric',
                 hour: 'numeric', minute: '2-digit'
             });
             const stopCount = entry.stops ? entry.stops.length : 0;
             return `
                 <div class="history-card">
+                    <div class="history-title">${date}</div>
                     <div class="history-route">
                         <span class="history-origin">📍 ${entry.origin}</span>
                         <span class="history-arrow">→ ${stopCount} stop${stopCount !== 1 ? 's' : ''} →</span>
@@ -1097,7 +1098,6 @@
                     </div>
                     <div class="history-meta">
                         <span>${entry.totalTime} · ${entry.totalDistance}</span>
-                        <span>${date}</span>
                     </div>
                     <div class="history-actions">
                         <button class="btn-load" onclick="window._loadHistory(${idx})">Load</button>
