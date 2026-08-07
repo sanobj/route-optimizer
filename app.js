@@ -590,12 +590,17 @@
 
         directionsService.route(request, (result, status) => {
             if (status === google.maps.DirectionsStatus.OK) {
-                displayRoute(result, origin, waypoints);
+                try {
+                    displayRoute(result, origin, waypoints);
+                } catch (e) {
+                    console.error('displayRoute error:', e);
+                }
             } else {
                 handleDirectionsError(status);
             }
             optimizeBtn.innerHTML = 'Optimize Route';
             optimizeBtn.disabled = false;
+            updateOptimizeButton();
         });
     }
 
@@ -638,13 +643,22 @@
         window._routeMarkers.push(marker);
     }
 
-    function reorderStopsToMatch(orderedAddresses) {
+    function reorderStopsToMatch(orderedAddresses, excludeLast) {
         // Reorder the stops array and DOM to match the optimized route order
         // orderedAddresses is the list of waypoint addresses in optimized order
+        // excludeLast: if true, keep the last filled stop in place (it was used as destination)
         if (!orderedAddresses || orderedAddresses.length === 0) return;
 
         const filledStops = stops.filter(s => s.address.trim().length > 0);
         const emptyStops = stops.filter(s => s.address.trim().length === 0);
+
+        // If excludeLast, separate the last filled stop (destination) from the reorderable ones
+        let lastStop = null;
+        let reorderableStops = filledStops;
+        if (excludeLast && filledStops.length > 1) {
+            lastStop = filledStops[filledStops.length - 1];
+            reorderableStops = filledStops.slice(0, -1);
+        }
 
         // Build new ordered array of filled stops based on optimized addresses
         const reordered = [];
@@ -652,28 +666,32 @@
 
         orderedAddresses.forEach(addr => {
             // Find the matching stop (by address, case-insensitive)
-            const match = filledStops.find((s, i) => !used.has(i) && s.address.trim().toLowerCase() === addr.toLowerCase());
+            const match = reorderableStops.find((s, i) => !used.has(i) && s.address.trim().toLowerCase() === addr.toLowerCase());
             if (match) {
-                used.add(filledStops.indexOf(match));
+                used.add(reorderableStops.indexOf(match));
                 reordered.push(match);
             } else {
-                // Fallback: try partial match (Google may return slightly different formatting)
-                const partial = filledStops.find((s, i) => !used.has(i));
+                // Fallback: try next unmatched stop (Google may return slightly different formatting)
+                const partial = reorderableStops.find((s, i) => !used.has(i));
                 if (partial) {
-                    used.add(filledStops.indexOf(partial));
+                    used.add(reorderableStops.indexOf(partial));
                     partial.address = addr; // Update to the Google-formatted address
                     reordered.push(partial);
                 }
             }
         });
 
-        // Add any remaining filled stops that weren't matched
-        filledStops.forEach((s, i) => {
+        // Add any remaining reorderable stops that weren't matched
+        reorderableStops.forEach((s, i) => {
             if (!used.has(i)) reordered.push(s);
         });
 
-        // Rebuild stops array: reordered filled + empty
-        stops = [...reordered, ...emptyStops];
+        // Rebuild stops array: reordered + lastStop (if excluded) + empty
+        if (lastStop) {
+            stops = [...reordered, lastStop, ...emptyStops];
+        } else {
+            stops = [...reordered, ...emptyStops];
+        }
 
         // Rebuild DOM
         stopsContainer.innerHTML = '';
@@ -734,7 +752,13 @@
         // (last leg end is the destination, not a waypoint)
         if (legs.length > 1) {
             const optimizedStopAddresses = legs.slice(0, -1).map(leg => leg.end_address);
-            reorderStopsToMatch(optimizedStopAddresses);
+            // In "No End" mode, the last filled stop was used as destination,
+            // so we only reorder the waypoint stops (exclude the last one)
+            if (endMode === 'none') {
+                reorderStopsToMatch(optimizedStopAddresses, true);
+            } else {
+                reorderStopsToMatch(optimizedStopAddresses, false);
+            }
         } else if (legs.length === 1 && stops.filter(s => s.address.trim()).length === 1) {
             // Single stop — update its address to the Google-formatted version
             const filledStop = stops.find(s => s.address.trim().length > 0);
