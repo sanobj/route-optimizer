@@ -1037,8 +1037,6 @@
             endMode: endMode,
         });
 
-        // Scroll to map
-        mapContainer.scrollIntoView({ behavior: 'smooth' });
     }
 
     function handleDirectionsError(status) {
