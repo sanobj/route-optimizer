@@ -62,8 +62,15 @@
                 <input type="password" id="api-key-input" placeholder="Enter your API key">
                 <p class="hint">Get a free key at <a href="https://console.cloud.google.com/" target="_blank">Google Cloud Console</a></p>
                 <div class="settings-toggle">
-                    <label for="advanced-ui-toggle">Advanced UI (Bus/Res)</label>
+                    <label for="advanced-ui-toggle">Advanced UI (Bus/Res) <button type="button" class="info-btn" id="advanced-info-btn">ⓘ</button></label>
                     <input type="checkbox" id="advanced-ui-toggle">
+                </div>
+                <div id="advanced-info" class="settings-info hidden">
+                    <p>Tap the numbered circle on each stop to cycle:</p>
+                    <p><span class="info-dot" style="background:#4da6ff;"></span> Default — no priority</p>
+                    <p><span class="info-dot" style="background:#ff8c00;"></span> Business — optimized first</p>
+                    <p><span class="info-dot" style="background:#9c27b0;"></span> Residence — optimized after businesses</p>
+                    <p class="hint">Businesses always route before residences. Pinned stops override priority.</p>
                 </div>
                 <div class="modal-actions">
                     <button id="save-key-btn" class="btn btn-primary">Save</button>

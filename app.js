@@ -313,9 +313,19 @@
     }
 
     // Settings
+    const advancedInfoBtn = document.getElementById('advanced-info-btn');
+    const advancedInfo = document.getElementById('advanced-info');
+    if (advancedInfoBtn && advancedInfo) {
+        advancedInfoBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            advancedInfo.classList.toggle('hidden');
+        });
+    }
+
     function openSettings() {
         apiKeyInput.value = apiKey;
         document.getElementById('advanced-ui-toggle').checked = advancedUI;
+        if (advancedInfo) advancedInfo.classList.add('hidden');
         settingsModal.classList.remove('hidden');
     }
 
