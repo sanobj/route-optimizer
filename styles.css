@@ -262,11 +262,12 @@ body {
 .icon-btn {
     background: none;
     border: none;
-    font-size: 1.4rem;
+    font-size: 1.5rem;
     cursor: pointer;
     padding: 8px;
     border-radius: 50%;
     transition: background 0.2s;
+    filter: brightness(1.1);
 }
 
 .icon-btn:hover {
@@ -302,6 +303,7 @@ body {
     padding: 8px 4px;
     outline: none;
     background: transparent;
+    color: var(--text);
 }
 
 .input-row input::placeholder {
@@ -578,13 +580,14 @@ body {
 .pac-container {
     z-index: 10000 !important;
     border-radius: 8px;
-    box-shadow: 0 4px 16px rgba(0,0,0,0.15);
-    border: none;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+    border: 1px solid var(--border);
     margin-top: 4px;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     pointer-events: auto !important;
     width: calc(100vw - 32px) !important;
     left: 16px !important;
+    background: var(--surface) !important;
 }
 
 .pac-item {
@@ -592,19 +595,25 @@ body {
     font-size: 0.9rem;
     border-bottom: 1px solid var(--border);
     cursor: pointer;
-    -webkit-tap-highlight-color: rgba(0,0,0,0.1);
+    -webkit-tap-highlight-color: rgba(255,255,255,0.1);
     touch-action: manipulation;
     white-space: normal;
     line-height: 1.4;
+    color: var(--text) !important;
 }
 
 .pac-item:hover,
 .pac-item:active {
-    background: var(--bg);
+    background: var(--surface-alt);
 }
 
 .pac-item-query {
     font-weight: 600;
+    color: var(--text) !important;
+}
+
+.pac-matched {
+    color: var(--primary) !important;
 }
 
 
