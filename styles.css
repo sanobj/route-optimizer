@@ -913,6 +913,21 @@ body {
     color: #000;
 }
 
+.input-row.pinned .stop-number.stop-num-bus {
+    background: #ff8c00;
+    color: white;
+}
+
+.input-row.pinned .stop-number.stop-num-res {
+    background: #9c27b0;
+    color: white;
+}
+
+.input-row.row-default.pinned .stop-number {
+    background: var(--primary);
+    color: white;
+}
+
 
 /* Row type highlights */
 .input-row.row-default {
