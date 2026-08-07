@@ -1119,17 +1119,20 @@
         }
 
         const defaultName = currentLoadedRouteName || `Route ${getSavedRoutes().length + 1}`;
-        const name = prompt('Name this route:', defaultName);
+        const saved = getSavedRoutes();
+        const existingWithDefault = saved.findIndex(r => r.name.toLowerCase() === defaultName.toLowerCase());
+
+        // If this would overwrite, make that clear in the prompt
+        let promptMsg = 'Name this route:';
+        if (existingWithDefault !== -1 && currentLoadedRouteName) {
+            promptMsg = `Save will overwrite "${defaultName}". Change name to save as new:`;
+        }
+
+        const name = prompt(promptMsg, defaultName);
         if (!name) return; // User cancelled
 
         const trimmedName = name.trim();
-        const saved = getSavedRoutes();
         const existingIndex = saved.findIndex(r => r.name.toLowerCase() === trimmedName.toLowerCase());
-
-        // If overwriting an existing save, confirm
-        if (existingIndex !== -1) {
-            if (!confirm(`Overwrite "${saved[existingIndex].name}"?`)) return;
-        }
 
         const route = {
             id: Date.now(),
