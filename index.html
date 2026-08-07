@@ -66,16 +66,14 @@
         <!-- Optimize Button -->
         <button id="optimize-btn" class="btn btn-optimize" disabled>Optimize Route</button>
 
-        <!-- Results Section -->
-        <section id="results-section" class="results-section hidden">
-            <h2>Optimized Route</h2>
-            <div id="route-summary" class="route-summary"></div>
-            <div id="route-steps" class="route-steps"></div>
-            <div class="result-actions">
-                <button id="navigate-btn" class="btn btn-navigate">Open in Google Maps</button>
-                <button id="save-route-btn" class="btn btn-save">💾 Save Route</button>
-            </div>
-        </section>
+        <!-- Route Summary (shown after optimization) -->
+        <div id="route-summary" class="route-summary hidden"></div>
+
+        <!-- Action Buttons (shown after optimization) -->
+        <div id="result-actions" class="result-actions hidden">
+            <button id="navigate-btn" class="btn btn-navigate">Open in Google Maps</button>
+            <button id="save-route-btn" class="btn btn-save">💾 Save Route</button>
+        </div>
 
         <!-- Saved Routes Section -->
         <section id="saved-routes-section" class="saved-routes-section">

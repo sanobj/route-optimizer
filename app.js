@@ -15,9 +15,8 @@
     const stopsContainer = document.getElementById('stops-container');
     const addStopBtn = document.getElementById('add-stop-btn');
     const optimizeBtn = document.getElementById('optimize-btn');
-    const resultsSection = document.getElementById('results-section');
     const routeSummary = document.getElementById('route-summary');
-    const routeSteps = document.getElementById('route-steps');
+    const resultActions = document.getElementById('result-actions');
     const navigateBtn = document.getElementById('navigate-btn');
     const settingsBtn = document.getElementById('settings-btn');
     const settingsModal = document.getElementById('settings-modal');
@@ -394,7 +393,8 @@
         // Show loading state
         optimizeBtn.innerHTML = '<span class="loading"></span> Optimizing...';
         optimizeBtn.disabled = true;
-        resultsSection.classList.add('hidden');
+        routeSummary.classList.add('hidden');
+        resultActions.classList.add('hidden');
 
         // Separate pinned and unpinned stops
         const pinnedStops = filledStops.filter(s => s.pinned);
@@ -796,57 +796,8 @@
                 <div class="stat-label">Stops</div>
             </div>
         `;
-
-        // Display optimized order
-        const waypointOrder = route.waypoint_order;
-        let stepsHtml = '';
-
-        // Start
-        stepsHtml += `
-            <div class="route-step">
-                <div class="step-timeline">
-                    <span class="timeline-dot dot-start">🟢</span>
-                    <span class="timeline-connector">
-                        <span class="connector-line"></span>
-                        <span class="connector-info">${legs[0].distance.text}<br>${legs[0].duration.text}</span>
-                        <span class="connector-line"></span>
-                    </span>
-                </div>
-                <div class="step-info">
-                    <div class="step-address">${legs[0].start_address}</div>
-                    <div class="step-detail">Start</div>
-                </div>
-            </div>
-        `;
-
-        // Intermediate stops in optimized order
-        legs.forEach((leg, i) => {
-            const isLast = i === legs.length - 1;
-            const dotClass = isLast ? 'dot-end' : 'dot-stop';
-            const dotContent = isLast ? '🔴' : `<span class="stop-number">${i + 1}</span>`;
-
-            stepsHtml += `
-                <div class="route-step">
-                    <div class="step-timeline">
-                        <span class="timeline-dot ${dotClass}">${dotContent}</span>
-                        ${!isLast ? `
-                        <span class="timeline-connector">
-                            <span class="connector-line"></span>
-                            <span class="connector-info">${legs[i + 1] ? legs[i + 1].distance.text : ''}<br>${legs[i + 1] ? legs[i + 1].duration.text : ''}</span>
-                            <span class="connector-line"></span>
-                        </span>
-                        ` : ''}
-                    </div>
-                    <div class="step-info">
-                        <div class="step-address">${leg.end_address}</div>
-                        <div class="step-detail">${isLast ? 'End' : 'Stop ' + (i + 1)}</div>
-                    </div>
-                </div>
-            `;
-        });
-
-        routeSteps.innerHTML = stepsHtml;
-        resultsSection.classList.remove('hidden');
+        routeSummary.classList.remove('hidden');
+        resultActions.classList.remove('hidden');
 
         // Save optimized route for Google Maps navigation link
         optimizedRoute = {
@@ -855,8 +806,8 @@
             waypoints: legs.slice(0, -1).map(leg => leg.end_address),
         };
 
-        // Scroll to results
-        resultsSection.scrollIntoView({ behavior: 'smooth' });
+        // Scroll to map
+        mapContainer.scrollIntoView({ behavior: 'smooth' });
     }
 
     function handleDirectionsError(status) {

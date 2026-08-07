@@ -266,31 +266,19 @@ body {
     justify-content: flex-end;
 }
 
-/* Results */
-.results-section {
-    margin-top: 24px;
-    background: var(--surface);
-    border-radius: var(--radius);
-    padding: 16px;
-    box-shadow: var(--shadow);
-}
-
-.results-section.hidden {
-    display: none;
-}
-
-.results-section h2 {
-    margin-bottom: 12px;
-    color: var(--success);
-}
-
+/* Route Summary */
 .route-summary {
     display: flex;
     gap: 16px;
     padding: 12px;
-    background: var(--bg);
+    background: var(--surface);
     border-radius: 8px;
-    margin-bottom: 12px;
+    box-shadow: var(--shadow);
+    margin-top: 12px;
+}
+
+.route-summary.hidden {
+    display: none;
 }
 
 .route-summary .stat {
@@ -308,84 +296,6 @@ body {
     font-size: 0.8rem;
     color: var(--text-secondary);
     text-transform: uppercase;
-}
-
-.route-steps {
-    list-style: none;
-}
-
-.route-step {
-    display: flex;
-    align-items: stretch;
-    gap: 12px;
-}
-
-.step-timeline {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    width: 36px;
-    flex-shrink: 0;
-}
-
-.timeline-dot {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 28px;
-    height: 28px;
-    font-size: 0.9rem;
-}
-
-.timeline-dot .stop-number {
-    width: 24px;
-    height: 24px;
-    background: var(--primary);
-    color: white;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 0.75rem;
-    font-weight: 700;
-}
-
-.timeline-connector {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    flex: 1;
-    padding: 4px 0;
-}
-
-.connector-line {
-    width: 2px;
-    flex: 1;
-    min-height: 8px;
-    background: var(--border);
-}
-
-.connector-info {
-    font-size: 0.65rem;
-    color: var(--text-secondary);
-    text-align: center;
-    padding: 2px 0;
-    line-height: 1.3;
-    white-space: nowrap;
-}
-
-.route-step .step-info {
-    flex: 1;
-    padding: 8px 0;
-}
-
-.route-step .step-address {
-    font-weight: 500;
-}
-
-.route-step .step-detail {
-    font-size: 0.85rem;
-    color: var(--text-secondary);
 }
 
 /* Map */
@@ -473,6 +383,10 @@ body {
     flex-direction: column;
     gap: 8px;
     margin-top: 12px;
+}
+
+.result-actions.hidden {
+    display: none;
 }
 
 .btn-save {
