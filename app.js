@@ -829,16 +829,12 @@
 
         // Build leg breakdown HTML
         let breakdownHtml = '<div class="route-breakdown hidden">';
+        // Show first address
+        breakdownHtml += `<div class="breakdown-stop">${legs[0].start_address}</div>`;
+        // Show each leg's distance/time then the next address
         legs.forEach((leg, i) => {
-            const fromLabel = i === 0 ? 'Start' : `Stop ${i}`;
-            const toLabel = i === legs.length - 1 ? 'End' : `Stop ${i + 1}`;
-            breakdownHtml += `
-                <div class="breakdown-leg">
-                    <div class="breakdown-from">${leg.start_address}</div>
-                    <div class="breakdown-arrow">↓ ${leg.distance.text} · ${leg.duration.text}</div>
-                    <div class="breakdown-to">${leg.end_address}</div>
-                </div>
-            `;
+            breakdownHtml += `<div class="breakdown-arrow">↓ ${leg.distance.text} · ${leg.duration.text}</div>`;
+            breakdownHtml += `<div class="breakdown-stop">${leg.end_address}</div>`;
         });
         breakdownHtml += '</div>';
 

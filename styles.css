@@ -413,21 +413,14 @@ body {
     padding-top: 12px;
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 4px;
 }
 
 .route-breakdown.hidden {
     display: none;
 }
 
-.breakdown-leg {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-}
-
-.breakdown-from,
-.breakdown-to {
+.breakdown-stop {
     font-size: 0.85rem;
     font-weight: 500;
     white-space: nowrap;
