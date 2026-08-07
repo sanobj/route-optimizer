@@ -623,7 +623,7 @@
         window._routeMarkers.push(marker);
     }
 
-    function addNumberedMarker(position, label, color) {
+    function addNumberedMarker(position, label, color, address) {
         const svg = `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
             <svg xmlns="http://www.w3.org/2000/svg" width="32" height="40" viewBox="0 0 32 40">
                 <path d="M16 0C7.2 0 0 7.2 0 16c0 12 16 24 16 24s16-12 16-24C32 7.2 24.8 0 16 0z" fill="${color}"/>
@@ -641,6 +641,19 @@
                 anchor: new google.maps.Point(16, 40),
             },
         });
+
+        if (address) {
+            const infoWindow = new google.maps.InfoWindow({
+                content: `<div style="font-size:14px;font-weight:500;max-width:200px;">${address}</div>`,
+            });
+            marker.addListener('click', () => {
+                // Close any previously open info window
+                if (window._openInfoWindow) window._openInfoWindow.close();
+                infoWindow.open(map, marker);
+                window._openInfoWindow = infoWindow;
+            });
+        }
+
         window._routeMarkers.push(marker);
     }
 
@@ -790,7 +803,7 @@
             const isLast = i === legs.length - 1;
             const label = isLast ? '●' : String(i + 1);
             const color = isLast ? '#ea4335' : '#1a73e8';
-            addNumberedMarker(leg.end_location, label, color);
+            addNumberedMarker(leg.end_location, label, color, leg.end_address);
         });
 
         // Calculate totals
