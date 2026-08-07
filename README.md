@@ -10,12 +10,15 @@ A Progressive Web App that optimizes multi-stop driving routes for the fastest/s
 
 - 📍 GPS location detection (shows your street address, not coordinates)
 - 🔍 Address autocomplete powered by Google Places
-- 🗺️ Interactive map with numbered markers matching the route list
-- ⚡ Waypoint optimization (up to 25 stops)
+- 🗺️ Interactive map with numbered markers (tap a marker to see the address)
+- ⚡ Waypoint optimization (up to 25 stops) — reorders stops in place
 - 📌 Pin stops to lock them in position — only unpinned stops get optimized
-- ▲▼ Reorder stops manually with move buttons
+- ☰ Drag to reorder stops manually (hold the handle on mobile)
 - 🔄 End mode options: No End, Round Trip, or custom End Address
-- 💾 Save and load routes (stored locally in your browser)
+- 📊 Collapsible route breakdown showing distance/time between each stop
+- 💾 Save and load routes with overwrite protection
+- 🕘 Auto-saved route history (optimizations and clears) for easy recovery
+- ✕ Clear button to reset all fields (auto-saves to history first)
 - 📱 Installable as home screen app (PWA)
 - 🔒 API key stored locally on your device
 
@@ -25,11 +28,11 @@ A Progressive Web App that optimizes multi-stop driving routes for the fastest/s
 2. **Choose an end mode**: No End, Round Trip, or enter an End Address
 3. **Add your stops** — type and select from autocomplete suggestions
 4. **Pin any stops** you need in a fixed position (📌 button)
-5. **Reorder stops** with ▲▼ if needed
-6. **Tap "Optimize Route"** — Google reorders unpinned stops for the fastest route
-7. **View the timeline** with distance/time between each stop
+5. **Drag stops** to reorder manually (hold the ☰ handle on mobile)
+6. **Tap "Optimize Route"** — Google reorders unpinned stops for the fastest route, updating them in place
+7. **Tap the summary bar** to see a breakdown of distance/time between each stop
 8. **Tap "Open in Google Maps"** for turn-by-turn navigation
-9. **Save the route** for later editing
+9. **Save the route** for later — saving with the same name overwrites, a new name creates a new save
 
 ## Setup
 
