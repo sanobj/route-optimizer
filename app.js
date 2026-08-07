@@ -33,6 +33,9 @@
     // Last optimized route data for navigation link
     let optimizedRoute = null;
 
+    // Track currently loaded saved route name
+    let currentLoadedRouteName = null;
+
     // Initialize
     function init() {
         addStopBtn.addEventListener('click', addStop);
@@ -1110,12 +1113,14 @@
             return;
         }
 
-        const name = prompt('Name this route:', `Route ${getSavedRoutes().length + 1}`);
+        const defaultName = currentLoadedRouteName || `Route ${getSavedRoutes().length + 1}`;
+        const name = prompt('Name this route:', defaultName);
         if (!name) return; // User cancelled
 
+        const trimmedName = name.trim();
         const route = {
             id: Date.now(),
-            name: name.trim(),
+            name: trimmedName,
             origin: origin,
             destination: destination,
             endMode: endMode,
@@ -1125,15 +1130,26 @@
         };
 
         const saved = getSavedRoutes();
-        saved.unshift(route);
+
+        // If name matches an existing save, replace it
+        const existingIndex = saved.findIndex(r => r.name.toLowerCase() === trimmedName.toLowerCase());
+        if (existingIndex !== -1) {
+            saved[existingIndex] = route;
+        } else {
+            saved.unshift(route);
+        }
+
         setSavedRoutes(saved);
-        renderSavedRoutes();
+        currentLoadedRouteName = trimmedName;
     }
 
     function loadRoute(id) {
         const saved = getSavedRoutes();
         const route = saved.find(r => r.id === id);
         if (!route) return;
+
+        // Track loaded route name
+        currentLoadedRouteName = route.name;
 
         // Clear current stops
         stopsContainer.innerHTML = '';
@@ -1313,6 +1329,9 @@
         const history = getHistory();
         const entry = history[idx];
         if (!entry) return;
+
+        // History loads don't have a saved route name
+        currentLoadedRouteName = null;
 
         // Clear current stops
         stopsContainer.innerHTML = '';
