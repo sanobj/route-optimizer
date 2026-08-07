@@ -644,10 +644,11 @@
 
         if (address) {
             const infoWindow = new google.maps.InfoWindow({
-                content: `<div style="font-size:14px;font-weight:500;max-width:200px;">${address}</div>`,
+                content: `<div style="font-size:13px;font-weight:500;padding:0;margin:0;">${address}</div>`,
+                maxWidth: 250,
+                disableAutoPan: false,
             });
             marker.addListener('click', () => {
-                // Close any previously open info window
                 if (window._openInfoWindow) window._openInfoWindow.close();
                 infoWindow.open(map, marker);
                 window._openInfoWindow = infoWindow;
