@@ -831,6 +831,16 @@
             waypoints: legs.slice(0, -1).map(leg => leg.end_address),
         };
 
+        // Auto-save to route history
+        saveToHistory({
+            origin: legs[0].start_address,
+            destination: legs[legs.length - 1].end_address,
+            stops: legs.slice(0, -1).map(leg => leg.end_address),
+            totalTime: timeStr,
+            totalDistance: distanceMiles + ' mi',
+            timestamp: Date.now(),
+        });
+
         // Scroll to map
         mapContainer.scrollIntoView({ behavior: 'smooth' });
     }
@@ -1021,6 +1031,161 @@
 
     // Render saved routes on load
     renderSavedRoutes();
+
+    // ===== ROUTE HISTORY =====
+    function getHistory() {
+        const data = localStorage.getItem('routeHistory');
+        return data ? JSON.parse(data) : [];
+    }
+
+    function setHistory(history) {
+        localStorage.setItem('routeHistory', JSON.stringify(history));
+    }
+
+    function saveToHistory(entry) {
+        const history = getHistory();
+        history.unshift(entry);
+        // Keep last 50 entries
+        if (history.length > 50) history.length = 50;
+        setHistory(history);
+    }
+
+    // History modal elements
+    const historyBtn = document.getElementById('history-btn');
+    const historyModal = document.getElementById('history-modal');
+    const closeHistoryBtn = document.getElementById('close-history-btn');
+    const clearHistoryBtn = document.getElementById('clear-history-btn');
+    const historyList = document.getElementById('history-list');
+
+    historyBtn.addEventListener('click', openHistory);
+    closeHistoryBtn.addEventListener('click', closeHistory);
+    clearHistoryBtn.addEventListener('click', () => {
+        if (!confirm('Clear all route history?')) return;
+        setHistory([]);
+        renderHistory();
+    });
+
+    function openHistory() {
+        renderHistory();
+        historyModal.classList.remove('hidden');
+    }
+
+    function closeHistory() {
+        historyModal.classList.add('hidden');
+    }
+
+    function renderHistory() {
+        const history = getHistory();
+
+        if (history.length === 0) {
+            historyList.innerHTML = '<p class="empty-state">No history yet</p>';
+            return;
+        }
+
+        historyList.innerHTML = history.map((entry, idx) => {
+            const date = new Date(entry.timestamp).toLocaleDateString(undefined, {
+                month: 'short', day: 'numeric', year: 'numeric',
+                hour: 'numeric', minute: '2-digit'
+            });
+            const stopCount = entry.stops ? entry.stops.length : 0;
+            return `
+                <div class="history-card">
+                    <div class="history-route">
+                        <span class="history-origin">📍 ${entry.origin}</span>
+                        <span class="history-arrow">→ ${stopCount} stop${stopCount !== 1 ? 's' : ''} →</span>
+                        <span class="history-dest">🔴 ${entry.destination}</span>
+                    </div>
+                    <div class="history-meta">
+                        <span>${entry.totalTime} · ${entry.totalDistance}</span>
+                        <span>${date}</span>
+                    </div>
+                    <div class="history-actions">
+                        <button class="btn-load" onclick="window._loadHistory(${idx})">Load</button>
+                        <button class="btn-delete-route" onclick="window._deleteHistory(${idx})">Delete</button>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    function loadHistory(idx) {
+        const history = getHistory();
+        const entry = history[idx];
+        if (!entry) return;
+
+        // Clear current stops
+        stopsContainer.innerHTML = '';
+        stops = [];
+
+        // Set origin
+        startInput.value = entry.origin;
+
+        // Set end mode to address with the destination
+        endMode = 'address';
+        endModeBtns.forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.mode === 'address');
+        });
+        endInputRow.classList.remove('hidden');
+        endInput.value = entry.destination;
+
+        // Add stops
+        const allStops = entry.stops || [];
+        allStops.forEach(address => {
+            const index = stops.length;
+            const stopId = Date.now() + index + Math.random();
+            stops.push({ id: stopId, address: address, pinned: false });
+
+            const stopEl = document.createElement('div');
+            stopEl.className = 'input-row';
+            stopEl.dataset.id = stopId;
+            stopEl.innerHTML = `
+                <button class="pin-btn" aria-label="Pin this stop" data-id="${stopId}" title="Pin to keep position">🔓</button>
+                <span class="stop-number">${index + 1}</span>
+                <input type="text" class="stop-input" placeholder="Enter destination address" autocomplete="new-password" data-id="${stopId}" value="${address}">
+                <button class="move-up-btn" aria-label="Move up" data-id="${stopId}">▲</button>
+                <button class="move-down-btn" aria-label="Move down" data-id="${stopId}">▼</button>
+                <button class="remove-btn" aria-label="Remove stop" data-id="${stopId}">✕</button>
+            `;
+            stopsContainer.appendChild(stopEl);
+
+            const input = stopEl.querySelector('.stop-input');
+            const removeBtn = stopEl.querySelector('.remove-btn');
+            const pinBtn = stopEl.querySelector('.pin-btn');
+            const moveUpBtn = stopEl.querySelector('.move-up-btn');
+            const moveDownBtn = stopEl.querySelector('.move-down-btn');
+
+            input.addEventListener('input', (e) => {
+                const s = stops.find(st => st.id === stopId);
+                if (s) s.address = e.target.value;
+                updateOptimizeButton();
+            });
+
+            removeBtn.addEventListener('click', () => removeStop(stopId));
+            pinBtn.addEventListener('click', () => togglePin(stopId));
+            moveUpBtn.addEventListener('click', () => moveStop(stopId, -1));
+            moveDownBtn.addEventListener('click', () => moveStop(stopId, 1));
+
+            if (window.google && google.maps.places) {
+                enableAutocomplete(input);
+            }
+        });
+
+        updateOptimizeButton();
+        closeHistory();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function deleteHistory(idx) {
+        if (!confirm('Delete this history entry?')) return;
+        const history = getHistory();
+        history.splice(idx, 1);
+        setHistory(history);
+        renderHistory();
+    }
+
+    // Expose to onclick handlers
+    window._loadHistory = loadHistory;
+    window._deleteHistory = deleteHistory;
 
     // Register Service Worker
     if ('serviceWorker' in navigator) {

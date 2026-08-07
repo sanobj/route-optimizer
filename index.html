@@ -17,8 +17,28 @@
         <!-- Header -->
         <header class="header">
             <h1>Route Optimizer</h1>
-            <button id="settings-btn" class="icon-btn" aria-label="Settings">⚙️</button>
+            <div class="header-actions">
+                <button id="history-btn" class="icon-btn" aria-label="Route History">🕘</button>
+                <button id="settings-btn" class="icon-btn" aria-label="Settings">⚙️</button>
+            </div>
         </header>
+
+        <!-- History Modal -->
+        <div id="history-modal" class="modal hidden">
+            <div class="modal-content modal-large">
+                <div class="modal-header">
+                    <h2>Route History</h2>
+                    <button id="close-history-btn" class="icon-btn" aria-label="Close">✕</button>
+                </div>
+                <p class="hint">Auto-saved every time you optimize a route.</p>
+                <div id="history-list" class="history-list">
+                    <p class="empty-state">No history yet</p>
+                </div>
+                <div class="modal-actions">
+                    <button id="clear-history-btn" class="btn btn-secondary">Clear All History</button>
+                </div>
+            </div>
+        </div>
 
         <!-- Settings Modal -->
         <div id="settings-modal" class="modal hidden">
