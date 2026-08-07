@@ -440,6 +440,14 @@ body {
     vertical-align: middle;
 }
 
+.breakdown-label.breakdown-start {
+    background: var(--success);
+}
+
+.breakdown-label.breakdown-end {
+    background: var(--danger);
+}
+
 .breakdown-arrow {
     font-size: 0.75rem;
     color: var(--primary);
