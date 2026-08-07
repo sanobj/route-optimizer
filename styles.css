@@ -188,13 +188,31 @@ body {
     background: rgba(26, 115, 232, 0.05);
 }
 
+.action-row {
+    display: flex;
+    gap: 8px;
+    margin-top: 16px;
+}
+
+.btn-clear {
+    background: var(--surface);
+    color: var(--danger);
+    border: 2px solid var(--danger);
+    padding: 16px;
+    font-size: 1rem;
+    white-space: nowrap;
+}
+
+.btn-clear:hover {
+    background: rgba(234, 67, 53, 0.05);
+}
+
 .btn-optimize {
-    width: 100%;
+    flex: 1;
     background: var(--primary);
     color: white;
     padding: 16px;
     font-size: 1.1rem;
-    margin-top: 16px;
     box-shadow: var(--shadow);
 }
 

@@ -43,6 +43,7 @@
     function init() {
         addStopBtn.addEventListener('click', addStop);
         optimizeBtn.addEventListener('click', optimizeRoute);
+        document.getElementById('clear-btn').addEventListener('click', clearAll);
         gpsBtn.addEventListener('click', getCurrentLocation);
         settingsBtn.addEventListener('click', openSettings);
         saveKeyBtn.addEventListener('click', saveApiKey);
@@ -177,6 +178,38 @@
             endReady = endInput.value.trim().length > 0;
         }
         optimizeBtn.disabled = !(hasStart && endReady && filledStops.length >= 1);
+    }
+
+    function clearAll() {
+        // Clear start
+        startInput.value = '';
+
+        // Reset end mode to none
+        endMode = 'none';
+        endModeBtns.forEach(btn => btn.classList.toggle('active', btn.dataset.mode === 'none'));
+        endInputRow.classList.add('hidden');
+        endInput.value = '';
+
+        // Clear stops and add one empty
+        stopsContainer.innerHTML = '';
+        stops = [];
+        addStop();
+
+        // Hide summary and actions
+        routeSummary.classList.add('hidden');
+        resultActions.classList.add('hidden');
+
+        // Clear map
+        if (directionsRenderer) directionsRenderer.setDirections({ routes: [] });
+        if (window._routeMarkers) {
+            window._routeMarkers.forEach(m => m.setMap(null));
+            window._routeMarkers = [];
+        }
+
+        // Reset state
+        optimizedRoute = null;
+        currentLoadedRouteName = null;
+        updateOptimizeButton();
     }
 
     // GPS
