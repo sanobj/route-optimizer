@@ -212,7 +212,7 @@ body {
     color: var(--danger);
     border: none;
     padding: 8px 12px;
-    font-size: 1.2rem;
+    font-size: 1.6rem;
     cursor: pointer;
     flex-shrink: 0;
 }
