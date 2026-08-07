@@ -1118,6 +1118,14 @@
         if (!name) return; // User cancelled
 
         const trimmedName = name.trim();
+        const saved = getSavedRoutes();
+        const existingIndex = saved.findIndex(r => r.name.toLowerCase() === trimmedName.toLowerCase());
+
+        // If overwriting an existing save, confirm
+        if (existingIndex !== -1) {
+            if (!confirm(`Overwrite "${saved[existingIndex].name}"?`)) return;
+        }
+
         const route = {
             id: Date.now(),
             name: trimmedName,
@@ -1129,10 +1137,6 @@
             createdAt: new Date().toLocaleDateString(),
         };
 
-        const saved = getSavedRoutes();
-
-        // If name matches an existing save, replace it
-        const existingIndex = saved.findIndex(r => r.name.toLowerCase() === trimmedName.toLowerCase());
         if (existingIndex !== -1) {
             saved[existingIndex] = route;
         } else {
