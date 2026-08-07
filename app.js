@@ -64,8 +64,7 @@
             });
         });
 
-        // Add two empty stops by default
-        addStop();
+        // Add one empty stop by default
         addStop();
 
         // If no API key, prompt settings
