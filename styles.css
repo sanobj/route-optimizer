@@ -245,7 +245,6 @@ body {
     padding: 16px;
     font-size: 1.1rem;
     margin-top: 16px;
-    margin-bottom: 8px;
     box-shadow: var(--shadow);
 }
 
@@ -584,7 +583,7 @@ body {
 .map-filter-row {
     display: flex;
     gap: 0;
-    margin-top: 24px;
+    margin-top: 16px;
     margin-bottom: 0;
     justify-content: center;
     background: var(--surface);
@@ -624,7 +623,7 @@ body {
 .map-container {
     width: 100%;
     height: 300px;
-    margin-top: 24px;
+    margin-top: 16px;
     border-radius: var(--radius);
     overflow: hidden;
     box-shadow: var(--shadow);
@@ -638,7 +637,7 @@ body {
 }
 
 .map-filter-row.hidden + .map-container {
-    margin-top: 24px;
+    margin-top: 16px;
     border-top-left-radius: var(--radius);
     border-top-right-radius: var(--radius);
 }
