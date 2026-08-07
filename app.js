@@ -643,27 +643,27 @@
         });
 
         if (address) {
+            const infoWindow = new google.maps.InfoWindow({
+                content: `<div style="display:flex;align-items:flex-start;gap:8px;font-size:13px;font-weight:500;padding:2px 0;"><span style="flex:1;">${address}</span><button onclick="this.closest('.gm-style-iw-c').querySelector('button.gm-ui-hover-effect')?.click();window._closeInfoWindow()" style="background:none;border:none;font-size:16px;cursor:pointer;padding:0 2px;color:#666;flex-shrink:0;">✕</button></div>`,
+                maxWidth: 220,
+                headerDisabled: true,
+            });
             marker.addListener('click', () => {
-                // Remove any existing custom tooltip
-                if (window._customTooltip) {
-                    window._customTooltip.remove();
-                    window._customTooltip = null;
-                }
-                // Create a simple tooltip div on the map container
-                const tooltip = document.createElement('div');
-                tooltip.className = 'map-tooltip';
-                tooltip.innerHTML = `<span>${address}</span><button class="tooltip-close">✕</button>`;
-                mapContainer.appendChild(tooltip);
-                window._customTooltip = tooltip;
-                tooltip.querySelector('.tooltip-close').addEventListener('click', () => {
-                    tooltip.remove();
-                    window._customTooltip = null;
-                });
+                if (window._openInfoWindow) window._openInfoWindow.close();
+                infoWindow.open(map, marker);
+                window._openInfoWindow = infoWindow;
             });
         }
 
         window._routeMarkers.push(marker);
     }
+
+    window._closeInfoWindow = function() {
+        if (window._openInfoWindow) {
+            window._openInfoWindow.close();
+            window._openInfoWindow = null;
+        }
+    };
 
     function reorderStopsToMatch(orderedAddresses, excludeLast) {
         // Reorder the stops array and DOM to match the optimized route order
