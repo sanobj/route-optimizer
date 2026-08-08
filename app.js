@@ -1201,13 +1201,14 @@
             const match = reorderableStops.find((s, i) => !used.has(i) && s.address.trim().toLowerCase() === addr.toLowerCase());
             if (match) {
                 used.add(reorderableStops.indexOf(match));
+                match.address = addr; // Update to Google-formatted address
                 reordered.push(match);
             } else {
-                // Fallback: try next unmatched stop (Google may return slightly different formatting)
+                // Fallback: match by next unused stop in order (Google may return different formatting)
                 const partial = reorderableStops.find((s, i) => !used.has(i));
                 if (partial) {
                     used.add(reorderableStops.indexOf(partial));
-                    partial.address = addr; // Update to the Google-formatted address
+                    partial.address = addr;
                     reordered.push(partial);
                 }
             }
@@ -1299,6 +1300,16 @@
         // Update end input if in address mode
         if (endMode === 'address') {
             endInput.value = legs[legs.length - 1].end_address;
+        }
+
+        // In "No End" mode, update the last stop's address to Google-formatted version
+        if (endMode === 'none' && legs.length > 0) {
+            const lastFilledStop = stops.filter(s => s.address.trim().length > 0).pop();
+            if (lastFilledStop) {
+                lastFilledStop.address = legs[legs.length - 1].end_address;
+                const lastInput = stopsContainer.querySelector(`[data-id="${lastFilledStop.id}"] .stop-input`);
+                if (lastInput) lastInput.value = lastFilledStop.address;
+            }
         }
 
         // Clear old custom markers
