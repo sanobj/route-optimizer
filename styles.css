@@ -916,6 +916,22 @@ body {
     z-index: 0;
 }
 
+.swipe-rush-bg {
+    position: absolute;
+    left: 0;
+    right: 0;
+    background: var(--warning);
+    color: #000;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    padding-left: 20px;
+    font-weight: 700;
+    font-size: 0.85rem;
+    border-radius: 8px;
+    z-index: 0;
+}
+
 .input-row {
     position: relative;
     z-index: 1;
@@ -924,26 +940,8 @@ body {
 
 /* Hide X buttons when Advanced UI is on */
 [data-advanced-ui="true"] .remove-btn,
-[data-advanced-ui="true"] .input-clear-btn,
-[data-advanced-ui="true"] .btn-delete-route {
+[data-advanced-ui="true"] .input-clear-btn {
     display: none;
-}
-
-/* Drag Handle */
-.drag-handle {
-    font-size: 1.1rem;
-    cursor: grab;
-    padding: 4px 8px;
-    color: var(--text-secondary);
-    flex-shrink: 0;
-    user-select: none;
-    -webkit-user-select: none;
-    touch-action: none;
-}
-
-.drag-handle:active {
-    cursor: grabbing;
-    color: var(--primary);
 }
 
 /* Dragging state */
@@ -969,33 +967,27 @@ body {
     background: rgba(234, 67, 53, 0.1);
 }
 
-/* Pinned row highlight */
-.input-row.pinned {
+/* Rush row highlight (swipe right) */
+.input-row.rush {
     background: rgba(255, 183, 77, 0.15);
     border-left: 3px solid var(--warning);
     padding-left: 8px;
     border-radius: 6px;
-    padding-left: 8px;
 }
 
-.input-row.pinned .stop-number {
+.input-row.rush .stop-number {
     background: var(--warning);
     color: #000;
 }
 
-.input-row.pinned .stop-number.stop-num-bus {
-    background: #ff8c00;
-    color: white;
+.input-row.rush .stop-number.stop-num-bus {
+    background: var(--warning);
+    color: #000;
 }
 
-.input-row.pinned .stop-number.stop-num-res {
-    background: #9c27b0;
-    color: white;
-}
-
-.input-row.row-default.pinned .stop-number {
-    background: var(--primary);
-    color: white;
+.input-row.rush .stop-number.stop-num-res {
+    background: var(--warning);
+    color: #000;
 }
 
 

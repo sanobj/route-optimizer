@@ -107,7 +107,6 @@
             <button class="pin-btn" aria-label="Pin this stop" data-id="${stopId}" title="Pin to keep position">🔓</button>
             <span class="stop-number" data-id="${stopId}">${index + 1}</span>
             <input type="text" class="stop-input" placeholder="Enter destination address" autocomplete="new-password" data-id="${stopId}">
-            <span class="drag-handle" data-id="${stopId}">☰</span>
             <button class="remove-btn" aria-label="Remove stop" data-id="${stopId}">✕</button>
         `;
 
@@ -558,10 +557,10 @@
     let dragReady = false;
 
     stopsContainer.addEventListener('touchstart', (e) => {
-        const handle = e.target.closest('.drag-handle');
-        if (!handle) return;
+        // Don't drag from pin button, remove button, or stop number (used for type cycling)
+        if (e.target.closest('.pin-btn') || e.target.closest('.remove-btn') || e.target.closest('.stop-number')) return;
 
-        const row = handle.closest('.input-row');
+        const row = e.target.closest('.input-row');
         if (!row) return;
 
         const touch = e.touches[0];
@@ -644,11 +643,9 @@
 
     // ===== MOUSE DRAG TO REORDER (Desktop) =====
     stopsContainer.addEventListener('mousedown', (e) => {
-        const handle = e.target.closest('.drag-handle');
-        if (!handle) return;
+        if (e.target.closest('.pin-btn') || e.target.closest('.remove-btn') || e.target.closest('.stop-number') || e.target.closest('.stop-input')) return;
 
-        e.preventDefault();
-        const row = handle.closest('.input-row');
+        const row = e.target.closest('.input-row');
         if (!row) return;
 
         dragState = {
@@ -702,14 +699,14 @@
         document.addEventListener('mouseup', onMouseUp);
     });
 
-    // ===== SWIPE TO DELETE (Advanced UI) =====
+    // ===== SWIPE TO DELETE (left) & RUSH (right) — Advanced UI =====
     let swipeState = null;
 
     function initSwipeDelete(container) {
         container.addEventListener('touchstart', (e) => {
             if (!advancedUI) return;
             if (dragReady || dragState) return; // Don't interfere with drag-to-reorder
-            if (e.target.closest('.drag-handle') || e.target.closest('.pin-btn')) return;
+            if (e.target.closest('.pin-btn')) return;
 
             const row = e.target.closest('.input-row');
             if (!row) return;
@@ -721,6 +718,7 @@
                 startY: touch.clientY,
                 currentX: 0,
                 swiping: false,
+                direction: null, // 'left' or 'right'
             };
         }, { passive: true });
 
@@ -738,15 +736,20 @@
                 return;
             }
 
-            // Only swipe left (negative dx)
+            // Swipe left (delete)
             if (dx < -10) {
                 swipeState.swiping = true;
+                swipeState.direction = 'left';
                 e.preventDefault();
                 swipeState.currentX = Math.max(dx, -120);
                 swipeState.row.style.transform = `translateX(${swipeState.currentX}px)`;
                 swipeState.row.style.transition = 'none';
 
-                // Show/update delete background (sibling positioned behind the row)
+                // Remove any rush bg
+                let rushBg = swipeState.row.nextElementSibling;
+                if (rushBg && rushBg.classList.contains('swipe-rush-bg')) rushBg.remove();
+
+                // Show delete background
                 let bg = swipeState.row.previousElementSibling;
                 if (!bg || !bg.classList.contains('swipe-delete-bg')) {
                     bg = document.createElement('div');
@@ -757,25 +760,48 @@
                 bg.style.height = swipeState.row.offsetHeight + 'px';
                 bg.style.top = swipeState.row.offsetTop + 'px';
             }
+
+            // Swipe right (rush)
+            if (dx > 10) {
+                swipeState.swiping = true;
+                swipeState.direction = 'right';
+                e.preventDefault();
+                swipeState.currentX = Math.min(dx, 120);
+                swipeState.row.style.transform = `translateX(${swipeState.currentX}px)`;
+                swipeState.row.style.transition = 'none';
+
+                // Remove any delete bg
+                let delBg = swipeState.row.previousElementSibling;
+                if (delBg && delBg.classList.contains('swipe-delete-bg')) delBg.remove();
+
+                // Show rush background
+                let bg = swipeState.row.nextElementSibling;
+                if (!bg || !bg.classList.contains('swipe-rush-bg')) {
+                    bg = document.createElement('div');
+                    bg.className = 'swipe-rush-bg';
+                    bg.textContent = 'Rush';
+                    swipeState.row.parentElement.insertBefore(bg, swipeState.row.nextSibling);
+                }
+                bg.style.height = swipeState.row.offsetHeight + 'px';
+                bg.style.top = swipeState.row.offsetTop + 'px';
+            }
         }, { passive: false });
 
         container.addEventListener('touchend', () => {
             if (!swipeState) return;
-            const { row, currentX, swiping } = swipeState;
+            const { row, currentX, swiping, direction } = swipeState;
             swipeState = null;
 
             if (!swiping) return;
 
-            if (currentX < -80) {
-                // Threshold met — delete
+            if (direction === 'left' && currentX < -80) {
+                // Delete
                 row.style.transition = 'transform 0.2s ease';
                 row.style.transform = 'translateX(-100%)';
                 setTimeout(() => {
-                    // Remove the delete background
                     const bg = row.previousElementSibling;
                     if (bg && bg.classList.contains('swipe-delete-bg')) bg.remove();
 
-                    // Determine what to delete
                     const id = Number(row.dataset.id);
                     if (id) {
                         removeStop(id);
@@ -789,6 +815,23 @@
                     row.style.transform = '';
                     row.style.transition = '';
                 }, 200);
+            } else if (direction === 'right' && currentX > 80) {
+                // Toggle Rush
+                const id = Number(row.dataset.id);
+                const stop = stops.find(s => s.id === id);
+                if (stop) {
+                    stop.rush = !stop.rush;
+                    row.classList.toggle('rush', stop.rush);
+                }
+                // Snap back
+                row.style.transition = 'transform 0.2s ease';
+                row.style.transform = 'translateX(0)';
+                setTimeout(() => {
+                    row.style.transform = '';
+                    row.style.transition = '';
+                    const bg = row.nextElementSibling;
+                    if (bg && bg.classList.contains('swipe-rush-bg')) bg.remove();
+                }, 200);
             } else {
                 // Snap back
                 row.style.transition = 'transform 0.2s ease';
@@ -798,6 +841,8 @@
                     row.style.transition = '';
                     const bg = row.previousElementSibling;
                     if (bg && bg.classList.contains('swipe-delete-bg')) bg.remove();
+                    const rushBg = row.nextElementSibling;
+                    if (rushBg && rushBg.classList.contains('swipe-rush-bg')) rushBg.remove();
                 }, 200);
             }
         });
@@ -1346,7 +1391,6 @@
                 <button class="pin-btn" aria-label="Pin this stop" data-id="${stop.id}" title="${stop.pinned ? 'Unpin to allow optimization' : 'Pin to keep position'}">${stop.pinned ? '📌' : '🔓'}</button>
                 <span class="stop-number ${stop.type === 'bus' ? 'stop-num-bus' : stop.type === 'res' ? 'stop-num-res' : ''}" data-id="${stop.id}">${index + 1}</span>
                 <input type="text" class="stop-input" placeholder="Enter destination address" autocomplete="new-password" data-id="${stop.id}" value="${stop.address}">
-                <span class="drag-handle" data-id="${stop.id}">☰</span>
                 <button class="remove-btn" aria-label="Remove stop" data-id="${stop.id}">✕</button>
             `;
             stopsContainer.appendChild(stopEl);
@@ -1753,7 +1797,6 @@
                 <button class="pin-btn" aria-label="Pin this stop" data-id="${stopId}" title="${pinned ? 'Unpin to allow optimization' : 'Pin to keep position'}">${pinned ? '📌' : '🔓'}</button>
                 <span class="stop-number ${numClass}" data-id="${stopId}">${index + 1}</span>
                 <input type="text" class="stop-input" placeholder="Enter destination address" autocomplete="new-password" data-id="${stopId}" value="${address}">
-                <span class="drag-handle" data-id="${stopId}">☰</span>
                 <button class="remove-btn" aria-label="Remove stop" data-id="${stopId}">✕</button>
             `;
 
@@ -1951,7 +1994,6 @@
                 <button class="pin-btn" aria-label="Pin this stop" data-id="${stopId}" title="${pinned ? 'Unpin to allow optimization' : 'Pin to keep position'}">${pinned ? '📌' : '🔓'}</button>
                 <span class="stop-number ${numClass}" data-id="${stopId}">${index + 1}</span>
                 <input type="text" class="stop-input" placeholder="Enter destination address" autocomplete="new-password" data-id="${stopId}" value="${address}">
-                <span class="drag-handle" data-id="${stopId}">☰</span>
                 <button class="remove-btn" aria-label="Remove stop" data-id="${stopId}">✕</button>
             `;
             stopsContainer.appendChild(stopEl);
