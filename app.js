@@ -645,6 +645,7 @@
     stopsContainer.addEventListener('mousedown', (e) => {
         if (e.target.closest('.pin-btn') || e.target.closest('.remove-btn') || e.target.closest('.stop-number') || e.target.closest('.stop-input')) return;
 
+        e.preventDefault();
         const row = e.target.closest('.input-row');
         if (!row) return;
 
@@ -934,25 +935,6 @@
             }
         });
     }
-
-    // Init swipe on saved routes list
-    initCardSwipeDelete(savedRoutesList, (card) => {
-        const id = Number(card.dataset.id);
-        if (id) {
-            const saved = getSavedRoutes().filter(r => r.id !== id);
-            setSavedRoutes(saved);
-        }
-    });
-
-    // Init swipe on history list
-    initCardSwipeDelete(historyList, (card) => {
-        const idx = parseInt(card.dataset.idx);
-        if (!isNaN(idx)) {
-            const history = getHistory();
-            history.splice(idx, 1);
-            setHistory(history);
-        }
-    });
 
     // Route Optimization
     async function optimizeRoute() {
@@ -2034,6 +2016,24 @@
     // Expose to onclick handlers
     window._loadHistory = loadHistory;
     window._deleteHistory = deleteHistory;
+
+    // Init swipe-to-delete on saved routes and history cards
+    initCardSwipeDelete(savedRoutesList, (card) => {
+        const id = Number(card.dataset.id);
+        if (id) {
+            const saved = getSavedRoutes().filter(r => r.id !== id);
+            setSavedRoutes(saved);
+        }
+    });
+
+    initCardSwipeDelete(historyList, (card) => {
+        const idx = parseInt(card.dataset.idx);
+        if (!isNaN(idx)) {
+            const history = getHistory();
+            history.splice(idx, 1);
+            setHistory(history);
+        }
+    });
 
     // Register Service Worker
     if ('serviceWorker' in navigator) {
