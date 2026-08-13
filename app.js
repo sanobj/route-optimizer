@@ -1233,12 +1233,14 @@
         window._routeMarkers.push({ marker, type: 'start' });
     }
 
-    function addNumberedMarker(position, label, color, address, stopType) {
+    function addNumberedMarker(position, label, color, address, stopType, isRush) {
+        const innerFill = isRush ? '#ffb74d' : 'white';
+        const textFill = isRush ? '#000' : color;
         const svg = `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
             <svg xmlns="http://www.w3.org/2000/svg" width="32" height="40" viewBox="0 0 32 40">
                 <path d="M16 0C7.2 0 0 7.2 0 16c0 12 16 24 16 24s16-12 16-24C32 7.2 24.8 0 16 0z" fill="${color}"/>
-                <circle cx="16" cy="16" r="10" fill="white"/>
-                <text x="16" y="21" text-anchor="middle" font-size="12" font-weight="bold" fill="${color}">${label}</text>
+                <circle cx="16" cy="16" r="10" fill="${innerFill}"/>
+                <text x="16" y="21" text-anchor="middle" font-size="12" font-weight="bold" fill="${textFill}">${label}</text>
             </svg>
         `)}`;
 
@@ -1469,6 +1471,7 @@
             const label = isLast ? '●' : String(i + 1);
             let color;
             let markerType = 'none';
+            let isRush = false;
             if (isLast) {
                 color = '#ea4335'; // red for end
                 markerType = 'end';
@@ -1484,8 +1487,9 @@
                 } else {
                     color = '#1a73e8'; // blue default
                 }
+                if (stop && stop.rush) isRush = true;
             }
-            addNumberedMarker(leg.end_location, label, color, leg.end_address, markerType);
+            addNumberedMarker(leg.end_location, label, color, leg.end_address, markerType, isRush);
         });
 
         // Draw per-leg polylines with type info for filtering
