@@ -238,6 +238,10 @@
             window._routeMarkers.forEach(m => m.marker.setMap(null));
             window._routeMarkers = [];
         }
+        if (window._routePolylines) {
+            window._routePolylines.forEach(p => p.polyline.setMap(null));
+            window._routePolylines = [];
+        }
 
         // Reset state
         optimizedRoute = null;
@@ -433,7 +437,7 @@
 
         const script = document.createElement('script');
         script.id = 'google-maps-script';
-        script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places&callback=initMap`;
+        script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places,geometry&callback=initMap`;
         script.async = true;
         script.defer = true;
         script.onerror = () => {
@@ -1168,6 +1172,18 @@
                 item.marker.setVisible(item.type === 'res' || item.type === 'start');
             }
         });
+        // Show/hide polylines
+        if (window._routePolylines) {
+            window._routePolylines.forEach(item => {
+                if (filter === 'all') {
+                    item.polyline.setVisible(true);
+                } else if (filter === 'bus') {
+                    item.polyline.setVisible(item.type === 'bus' || item.type === 'start');
+                } else if (filter === 'res') {
+                    item.polyline.setVisible(item.type === 'res' || item.type === 'end');
+                }
+            });
+        }
     }
 
     function reorderStopsToMatch(orderedAddresses, excludeLast) {
@@ -1259,8 +1275,9 @@
         // Show on map
         if (directionsRenderer) {
             directionsRenderer.setDirections(result);
-            // Hide default A, B, C markers — we'll add our own
             directionsRenderer.setOptions({ suppressMarkers: true });
+            // Hide the default polyline — we'll draw our own per-leg polylines
+            directionsRenderer.setOptions({ polylineOptions: { visible: false } });
         }
         mapContainer.classList.add('active');
 
@@ -1307,11 +1324,15 @@
             }
         }
 
-        // Clear old custom markers
+        // Clear old custom markers and polylines
         if (window._routeMarkers) {
             window._routeMarkers.forEach(m => m.marker.setMap(null));
         }
         window._routeMarkers = [];
+        if (window._routePolylines) {
+            window._routePolylines.forEach(p => p.polyline.setMap(null));
+        }
+        window._routePolylines = [];
 
         // Add custom numbered markers
         // Start marker (green)
@@ -1340,6 +1361,52 @@
                 }
             }
             addNumberedMarker(leg.end_location, label, color, leg.end_address, markerType);
+        });
+
+        // Draw per-leg polylines with type info for filtering
+        if (window._routePolylines) {
+            window._routePolylines.forEach(p => p.polyline.setMap(null));
+        }
+        window._routePolylines = [];
+
+        legs.forEach((leg, i) => {
+            // Determine the type of this leg based on the destination stop
+            let legType = 'none';
+            if (i < legs.length - 1) {
+                const stop = stops[i];
+                if (stop) legType = stop.type || 'none';
+            } else {
+                // Last leg — use the type of the last waypoint stop (or 'res' if going to end)
+                const lastWaypointStop = stops[stops.length - 1];
+                legType = (lastWaypointStop && lastWaypointStop.type) || 'end';
+            }
+
+            // Determine color
+            let strokeColor = '#4285F4'; // default blue
+            if (legType === 'bus') strokeColor = '#ff8c00';
+            else if (legType === 'res') strokeColor = '#9c27b0';
+
+            // Build path from leg steps
+            const path = [];
+            leg.steps.forEach(step => {
+                const decodedPath = google.maps.geometry ? 
+                    google.maps.geometry.encoding.decodePath(step.polyline.points) :
+                    step.path || [];
+                decodedPath.forEach(point => path.push(point));
+            });
+
+            // If geometry library isn't loaded, use lat_lngs from step
+            const polylinePath = path.length > 0 ? path : [leg.start_location, leg.end_location];
+
+            const polyline = new google.maps.Polyline({
+                path: polylinePath,
+                strokeColor: strokeColor,
+                strokeOpacity: 0.8,
+                strokeWeight: 5,
+                map: map,
+            });
+
+            window._routePolylines.push({ polyline, type: legType });
         });
 
         // Calculate totals
