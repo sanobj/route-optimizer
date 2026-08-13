@@ -100,6 +100,7 @@ body {
     flex-direction: column;
     gap: 8px;
     margin: 12px 0;
+    position: relative;
 }
 
 .history-card {
@@ -777,6 +778,7 @@ body {
     flex: 1;
     overflow-y: auto;
     margin: 12px 0;
+    position: relative;
 }
 
 .empty-state {
@@ -922,7 +924,8 @@ body {
 
 /* Hide X buttons when Advanced UI is on */
 [data-advanced-ui="true"] .remove-btn,
-[data-advanced-ui="true"] .input-clear-btn {
+[data-advanced-ui="true"] .input-clear-btn,
+[data-advanced-ui="true"] .btn-delete-route {
     display: none;
 }
 

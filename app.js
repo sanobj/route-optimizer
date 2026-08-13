@@ -810,6 +810,105 @@
     initSwipeDelete(document.querySelector('.start-location'));
     initSwipeDelete(document.querySelector('.end-location'));
 
+    // ===== SWIPE TO DELETE CARDS (Advanced UI) =====
+    function initCardSwipeDelete(container, onDelete) {
+        let cardSwipeState = null;
+
+        container.addEventListener('touchstart', (e) => {
+            if (!advancedUI) return;
+            const card = e.target.closest('.saved-route-card, .history-card');
+            if (!card) return;
+            if (e.target.closest('.btn-load')) return;
+
+            const touch = e.touches[0];
+            cardSwipeState = {
+                card: card,
+                startX: touch.clientX,
+                startY: touch.clientY,
+                currentX: 0,
+                swiping: false,
+            };
+        }, { passive: true });
+
+        container.addEventListener('touchmove', (e) => {
+            if (!cardSwipeState) return;
+
+            const touch = e.touches[0];
+            const dx = touch.clientX - cardSwipeState.startX;
+            const dy = touch.clientY - cardSwipeState.startY;
+
+            if (!cardSwipeState.swiping && Math.abs(dy) > Math.abs(dx)) {
+                cardSwipeState = null;
+                return;
+            }
+
+            if (dx < -10) {
+                cardSwipeState.swiping = true;
+                e.preventDefault();
+                cardSwipeState.currentX = Math.max(dx, -120);
+                cardSwipeState.card.style.transform = `translateX(${cardSwipeState.currentX}px)`;
+                cardSwipeState.card.style.transition = 'none';
+
+                let bg = cardSwipeState.card.previousElementSibling;
+                if (!bg || !bg.classList.contains('swipe-delete-bg')) {
+                    bg = document.createElement('div');
+                    bg.className = 'swipe-delete-bg';
+                    bg.textContent = 'Delete';
+                    cardSwipeState.card.parentElement.insertBefore(bg, cardSwipeState.card);
+                }
+                bg.style.height = cardSwipeState.card.offsetHeight + 'px';
+                bg.style.top = cardSwipeState.card.offsetTop + 'px';
+            }
+        }, { passive: false });
+
+        container.addEventListener('touchend', () => {
+            if (!cardSwipeState) return;
+            const { card, currentX, swiping } = cardSwipeState;
+            cardSwipeState = null;
+
+            if (!swiping) return;
+
+            if (currentX < -80) {
+                card.style.transition = 'transform 0.2s ease';
+                card.style.transform = 'translateX(-100%)';
+                setTimeout(() => {
+                    const bg = card.previousElementSibling;
+                    if (bg && bg.classList.contains('swipe-delete-bg')) bg.remove();
+                    onDelete(card);
+                    card.remove();
+                }, 200);
+            } else {
+                card.style.transition = 'transform 0.2s ease';
+                card.style.transform = 'translateX(0)';
+                setTimeout(() => {
+                    card.style.transform = '';
+                    card.style.transition = '';
+                    const bg = card.previousElementSibling;
+                    if (bg && bg.classList.contains('swipe-delete-bg')) bg.remove();
+                }, 200);
+            }
+        });
+    }
+
+    // Init swipe on saved routes list
+    initCardSwipeDelete(savedRoutesList, (card) => {
+        const id = Number(card.dataset.id);
+        if (id) {
+            const saved = getSavedRoutes().filter(r => r.id !== id);
+            setSavedRoutes(saved);
+        }
+    });
+
+    // Init swipe on history list
+    initCardSwipeDelete(historyList, (card) => {
+        const idx = parseInt(card.dataset.idx);
+        if (!isNaN(idx)) {
+            const history = getHistory();
+            history.splice(idx, 1);
+            setHistory(history);
+        }
+    });
+
     // Route Optimization
     async function optimizeRoute() {
         if (!apiKey) {
@@ -1703,7 +1802,7 @@
         }
 
         savedRoutesList.innerHTML = saved.map(route => `
-            <div class="saved-route-card">
+            <div class="saved-route-card" data-id="${route.id}">
                 <div class="route-name">${route.name}</div>
                 <div class="route-stops-preview">🟢 ${route.origin} → ${route.stops.length} stop${route.stops.length > 1 ? 's' : ''} → 🔴 ${route.destination || 'N/A'}</div>
                 <div class="route-meta">Saved ${route.createdAt}</div>
@@ -1786,7 +1885,7 @@
             const stopCount = entry.stops ? entry.stops.length : 0;
             const clearedTag = entry.cleared ? ' <span class="history-cleared">Cleared</span>' : '';
             return `
-                <div class="history-card${entry.cleared ? ' history-card-cleared' : ''}">
+                <div class="history-card${entry.cleared ? ' history-card-cleared' : ''}" data-idx="${idx}">
                     <div class="history-title">${date}${clearedTag}</div>
                     <div class="history-route">
                         <span class="history-origin">📍 ${entry.origin}</span>
