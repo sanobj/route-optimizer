@@ -954,20 +954,15 @@
                 const effectiveType = stopType === 'bus' ? 'bus' : 'other';
 
                 if (currentType !== null && effectiveType !== currentType && currentUnpinned.length > 0) {
-                    // Type boundary — end current segment, start new one
-                    // Use this stop's address as the destination of the segment? No — 
-                    // we need a midpoint. Use the last unpinned as a virtual endpoint.
-                    // Actually, better: just end the segment without a fixed endpoint
-                    // by making the last waypoint the segment destination.
-                    const lastWaypoint = currentUnpinned.pop();
+                    // Type boundary — use this stop as the destination of the current segment
                     segments.push({
                         origin: segStart,
-                        destination: lastWaypoint,
+                        destination: stop.address.trim(),
                         waypoints: currentUnpinned.slice(),
                         optimize: true,
                     });
-                    segStart = lastWaypoint;
-                    currentUnpinned = [stop.address.trim()];
+                    segStart = stop.address.trim();
+                    currentUnpinned = [];
                 } else {
                     currentUnpinned.push(stop.address.trim());
                 }
