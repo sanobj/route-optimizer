@@ -203,7 +203,7 @@
             saveToHistory({
                 origin: origin || '(none)',
                 destination: destination || '(none)',
-                stops: filledStops.map(s => ({ address: s.address, pinned: s.pinned, type: s.type })),
+                stops: filledStops.map(s => ({ address: s.address, pinned: s.pinned, type: s.type, rush: !!s.rush })),
                 totalTime: '-',
                 totalDistance: '-',
                 timestamp: Date.now(),
@@ -1367,7 +1367,7 @@
         stopsContainer.innerHTML = '';
         stops.forEach((stop, index) => {
             const stopEl = document.createElement('div');
-            stopEl.className = 'input-row' + (stop.pinned ? ' pinned' : '') + (advancedUI ? (stop.type === 'bus' ? ' row-bus' : stop.type === 'res' ? ' row-res' : ' row-default') : '');
+            stopEl.className = 'input-row' + (stop.pinned ? ' pinned' : '') + (stop.rush ? ' rush' : '') + (advancedUI ? (stop.type === 'bus' ? ' row-bus' : stop.type === 'res' ? ' row-res' : ' row-default') : '');
             stopEl.dataset.id = stop.id;
             stopEl.innerHTML = `
                 <button class="pin-btn" aria-label="Pin this stop" data-id="${stop.id}" title="${stop.pinned ? 'Unpin to allow optimization' : 'Pin to keep position'}">${stop.pinned ? '📌' : '🔓'}</button>
@@ -1612,7 +1612,7 @@
         saveToHistory({
             origin: legs[0].start_address,
             destination: legs[legs.length - 1].end_address,
-            stops: filledStopsForHistory.map(s => ({ address: s.address, pinned: s.pinned, type: s.type })),
+            stops: filledStopsForHistory.map(s => ({ address: s.address, pinned: s.pinned, type: s.type, rush: !!s.rush })),
             totalTime: timeStr,
             totalDistance: distanceMiles + ' mi',
             timestamp: Date.now(),
@@ -1690,7 +1690,7 @@
         const destination = endMode === 'address' ? endInput.value.trim() : '';
         const waypoints = stops
             .filter(s => s.address.trim().length > 0)
-            .map(s => ({ address: s.address.trim(), pinned: s.pinned, type: s.type || 'none' }));
+            .map(s => ({ address: s.address.trim(), pinned: s.pinned, type: s.type || 'none', rush: !!s.rush }));
 
         if (!origin || waypoints.length === 0) {
             alert('Nothing to save. Enter addresses first.');
@@ -1767,12 +1767,13 @@
             const address = typeof stopData === 'string' ? stopData : stopData.address || stopData;
             const type = (typeof stopData === 'object' && stopData.type) ? stopData.type : 'none';
             const pinned = (typeof stopData === 'object' && stopData.pinned) ? true : (route.pinnedIndices ? route.pinnedIndices.includes(i) : false);
+            const rush = (typeof stopData === 'object' && stopData.rush) ? true : false;
             const index = stops.length;
             const stopId = Date.now() + index + Math.random();
-            stops.push({ id: stopId, address: address, pinned: pinned, type: type });
+            stops.push({ id: stopId, address: address, pinned: pinned, type: type, rush: rush });
 
             const stopEl = document.createElement('div');
-            stopEl.className = 'input-row' + (pinned ? ' pinned' : '') + (advancedUI ? (type === 'bus' ? ' row-bus' : type === 'res' ? ' row-res' : ' row-default') : '');
+            stopEl.className = 'input-row' + (pinned ? ' pinned' : '') + (rush ? ' rush' : '') + (advancedUI ? (type === 'bus' ? ' row-bus' : type === 'res' ? ' row-res' : ' row-default') : '');
             stopEl.dataset.id = stopId;
             const numClass = type === 'bus' ? 'stop-num-bus' : type === 'res' ? 'stop-num-res' : '';
             stopEl.innerHTML = `
@@ -1963,13 +1964,14 @@
         allStops.forEach(stopData => {
             const address = typeof stopData === 'string' ? stopData : stopData.address;
             const pinned = typeof stopData === 'string' ? false : !!stopData.pinned;
+            const rush = typeof stopData === 'string' ? false : !!stopData.rush;
             const type = (typeof stopData === 'object' && stopData.type) ? stopData.type : 'none';
             const index = stops.length;
             const stopId = Date.now() + index + Math.random();
-            stops.push({ id: stopId, address: address, pinned: pinned, type: type });
+            stops.push({ id: stopId, address: address, pinned: pinned, type: type, rush: rush });
 
             const stopEl = document.createElement('div');
-            stopEl.className = 'input-row' + (pinned ? ' pinned' : '') + (advancedUI ? (type === 'bus' ? ' row-bus' : type === 'res' ? ' row-res' : ' row-default') : '');
+            stopEl.className = 'input-row' + (pinned ? ' pinned' : '') + (rush ? ' rush' : '') + (advancedUI ? (type === 'bus' ? ' row-bus' : type === 'res' ? ' row-res' : ' row-default') : '');
             stopEl.dataset.id = stopId;
             const numClass = type === 'bus' ? 'stop-num-bus' : type === 'res' ? 'stop-num-res' : '';
             stopEl.innerHTML = `
