@@ -697,7 +697,7 @@
         container.addEventListener('touchstart', (e) => {
             if (!advancedUI) return;
             if (dragReady || dragState) return; // Don't interfere with drag-to-reorder
-            if (e.target.closest('.pin-btn')) return;
+            if (e.target.closest('.pin-btn') || e.target.closest('.stop-number')) return;
 
             const row = e.target.closest('.input-row');
             if (!row) return;
