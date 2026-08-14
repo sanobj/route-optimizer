@@ -107,6 +107,7 @@
             <button class="pin-btn" aria-label="Pin this stop" data-id="${stopId}" title="Pin to keep position">🔓</button>
             <span class="stop-number" data-id="${stopId}">${index + 1}</span>
             <input type="text" class="stop-input" placeholder="Enter destination address" autocomplete="new-password" data-id="${stopId}">
+            <span class="drag-handle" data-id="${stopId}">≡</span>
             <button class="remove-btn" aria-label="Remove stop" data-id="${stopId}">✕</button>
         `;
 
@@ -557,10 +558,11 @@
     let dragReady = false;
 
     stopsContainer.addEventListener('touchstart', (e) => {
-        // Don't drag from pin button, remove button, or stop number (used for type cycling)
-        if (e.target.closest('.pin-btn') || e.target.closest('.remove-btn') || e.target.closest('.stop-number')) return;
+        // Only drag from the drag handle
+        const handle = e.target.closest('.drag-handle');
+        if (!handle) return;
 
-        const row = e.target.closest('.input-row');
+        const row = handle.closest('.input-row');
         if (!row) return;
 
         const touch = e.touches[0];
@@ -643,10 +645,11 @@
 
     // ===== MOUSE DRAG TO REORDER (Desktop) =====
     stopsContainer.addEventListener('mousedown', (e) => {
-        if (e.target.closest('.pin-btn') || e.target.closest('.remove-btn') || e.target.closest('.stop-number') || e.target.closest('.stop-input')) return;
+        const handle = e.target.closest('.drag-handle');
+        if (!handle) return;
 
         e.preventDefault();
-        const row = e.target.closest('.input-row');
+        const row = handle.closest('.input-row');
         if (!row) return;
 
         dragState = {
@@ -1375,6 +1378,7 @@
                 <button class="pin-btn" aria-label="Pin this stop" data-id="${stop.id}" title="${stop.pinned ? 'Unpin to allow optimization' : 'Pin to keep position'}">${stop.pinned ? '📌' : '🔓'}</button>
                 <span class="stop-number ${stop.type === 'bus' ? 'stop-num-bus' : stop.type === 'res' ? 'stop-num-res' : ''}" data-id="${stop.id}">${index + 1}</span>
                 <input type="text" class="stop-input" placeholder="Enter destination address" autocomplete="new-password" data-id="${stop.id}" value="${stop.address}">
+                <span class="drag-handle" data-id="${stop.id}">≡</span>
                 <button class="remove-btn" aria-label="Remove stop" data-id="${stop.id}">✕</button>
             `;
             stopsContainer.appendChild(stopEl);
@@ -1784,6 +1788,7 @@
                 <button class="pin-btn" aria-label="Pin this stop" data-id="${stopId}" title="${pinned ? 'Unpin to allow optimization' : 'Pin to keep position'}">${pinned ? '📌' : '🔓'}</button>
                 <span class="stop-number ${numClass}" data-id="${stopId}">${index + 1}</span>
                 <input type="text" class="stop-input" placeholder="Enter destination address" autocomplete="new-password" data-id="${stopId}" value="${address}">
+                <span class="drag-handle" data-id="${stopId}">≡</span>
                 <button class="remove-btn" aria-label="Remove stop" data-id="${stopId}">✕</button>
             `;
 
@@ -1982,6 +1987,7 @@
                 <button class="pin-btn" aria-label="Pin this stop" data-id="${stopId}" title="${pinned ? 'Unpin to allow optimization' : 'Pin to keep position'}">${pinned ? '📌' : '🔓'}</button>
                 <span class="stop-number ${numClass}" data-id="${stopId}">${index + 1}</span>
                 <input type="text" class="stop-input" placeholder="Enter destination address" autocomplete="new-password" data-id="${stopId}" value="${address}">
+                <span class="drag-handle" data-id="${stopId}">≡</span>
                 <button class="remove-btn" aria-label="Remove stop" data-id="${stopId}">✕</button>
             `;
             stopsContainer.appendChild(stopEl);

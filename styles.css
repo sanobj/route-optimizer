@@ -944,6 +944,24 @@ body {
     display: none;
 }
 
+/* Drag Handle */
+.drag-handle {
+    font-size: 1.4rem;
+    cursor: grab;
+    padding: 8px 10px;
+    color: var(--text-secondary);
+    flex-shrink: 0;
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: none;
+    line-height: 1;
+}
+
+.drag-handle:active {
+    cursor: grabbing;
+    color: var(--primary);
+}
+
 /* Dragging state */
 .input-row.dragging {
     background: rgba(77, 166, 255, 0.15);
