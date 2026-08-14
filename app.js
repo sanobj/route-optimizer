@@ -770,7 +770,7 @@
                 if (!bg || !bg.classList.contains('swipe-type-bg')) {
                     bg = document.createElement('div');
                     bg.className = 'swipe-type-bg';
-                    bg.innerHTML = '<button class="swipe-type-btn swipe-bus-btn">Bus</button><button class="swipe-type-btn swipe-res-btn">Res</button><button class="swipe-type-btn swipe-none-btn">✕</button>';
+                    bg.innerHTML = '<button class="swipe-type-btn swipe-bus-btn">Bus</button><button class="swipe-type-btn swipe-res-btn">Res</button>';
                     swipeState.row.parentElement.insertBefore(bg, swipeState.row.nextSibling);
                 }
                 bg.style.height = swipeState.row.offsetHeight + 'px';
@@ -842,9 +842,8 @@
                         }, 200);
                     };
 
-                    bg.querySelector('.swipe-bus-btn').onclick = () => closePanel('bus');
-                    bg.querySelector('.swipe-res-btn').onclick = () => closePanel('res');
-                    bg.querySelector('.swipe-none-btn').onclick = () => closePanel('none');
+                    bg.querySelector('.swipe-bus-btn').onclick = () => closePanel(stop.type === 'bus' ? 'none' : 'bus');
+                    bg.querySelector('.swipe-res-btn').onclick = () => closePanel(stop.type === 'res' ? 'none' : 'res');
                 }
             } else {
                 // Snap back
