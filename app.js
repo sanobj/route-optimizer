@@ -1723,7 +1723,7 @@
             origin: origin,
             destination: destination,
             endMode: endMode,
-            stops: waypoints.map(s => ({ address: s.address, pinned: s.pinned, type: s.type || 'none' })),
+            stops: waypoints.map(s => ({ address: s.address, pinned: s.pinned, type: s.type || 'none', rush: !!s.rush })),
             createdAt: new Date().toLocaleDateString(),
         };
 
