@@ -1583,7 +1583,7 @@
                     <div class="stat-label">Total Distance</div>
                 </div>
                 <div class="stat">
-                    <div class="stat-value">${legs.length + 1}</div>
+                    <div class="stat-value">${legs.length}</div>
                     <div class="stat-label">Stops</div>
                 </div>
             </div>
