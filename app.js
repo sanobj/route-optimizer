@@ -249,8 +249,8 @@
         updateOptimizeButton();
     }
 
-    // ===== BUS/RES TYPE CYCLING =====
-    // Tap the stop number circle to cycle: none (blue) → bus (orange) → res (purple) → none
+    // ===== RUSH TOGGLE (tap circle) =====
+    // Tap the stop number circle to toggle rush (gold)
     stopsContainer.addEventListener('click', (e) => {
         if (!advancedUI) return;
         const numberEl = e.target.closest('.stop-number');
@@ -263,25 +263,12 @@
         const stop = stops.find(s => s.id === id);
         if (!stop) return;
 
-        // Cycle: none → bus → res → none
-        if (stop.type === 'none' || !stop.type) {
-            stop.type = 'bus';
-        } else if (stop.type === 'bus') {
-            stop.type = 'res';
-        } else {
-            stop.type = 'none';
-        }
+        // Toggle rush
+        stop.rush = !stop.rush;
+        row.classList.toggle('rush', stop.rush);
 
-        // Update number circle color
-        numberEl.classList.remove('stop-num-bus', 'stop-num-res');
-        if (stop.type === 'bus') numberEl.classList.add('stop-num-bus');
-        if (stop.type === 'res') numberEl.classList.add('stop-num-res');
-
-        // Update row styling
-        row.classList.remove('row-default', 'row-bus', 'row-res');
-        if (stop.type === 'bus') row.classList.add('row-bus');
-        else if (stop.type === 'res') row.classList.add('row-res');
-        else row.classList.add('row-default');
+        // Update number circle — rush overrides color
+        numberEl.classList.toggle('stop-num-rush', stop.rush);
     });
 
     // GPS
@@ -765,7 +752,7 @@
                 bg.style.top = swipeState.row.offsetTop + 'px';
             }
 
-            // Swipe right (rush)
+            // Swipe right (bus/res selector)
             if (dx > 10) {
                 swipeState.swiping = true;
                 swipeState.direction = 'right';
@@ -778,12 +765,12 @@
                 let delBg = swipeState.row.previousElementSibling;
                 if (delBg && delBg.classList.contains('swipe-delete-bg')) delBg.remove();
 
-                // Show rush background
+                // Show bus/res selector background
                 let bg = swipeState.row.nextElementSibling;
-                if (!bg || !bg.classList.contains('swipe-rush-bg')) {
+                if (!bg || !bg.classList.contains('swipe-type-bg')) {
                     bg = document.createElement('div');
-                    bg.className = 'swipe-rush-bg';
-                    bg.textContent = 'Rush';
+                    bg.className = 'swipe-type-bg';
+                    bg.innerHTML = '<button class="swipe-type-btn swipe-bus-btn">Bus</button><button class="swipe-type-btn swipe-res-btn">Res</button><button class="swipe-type-btn swipe-none-btn">✕</button>';
                     swipeState.row.parentElement.insertBefore(bg, swipeState.row.nextSibling);
                 }
                 bg.style.height = swipeState.row.offsetHeight + 'px';
@@ -820,22 +807,45 @@
                     row.style.transition = '';
                 }, 200);
             } else if (direction === 'right' && currentX > 80) {
-                // Toggle Rush
-                const id = Number(row.dataset.id);
-                const stop = stops.find(s => s.id === id);
-                if (stop) {
-                    stop.rush = !stop.rush;
-                    row.classList.toggle('rush', stop.rush);
-                }
-                // Snap back
+                // Hold row open — show bus/res selector, wait for tap
                 row.style.transition = 'transform 0.2s ease';
-                row.style.transform = 'translateX(0)';
-                setTimeout(() => {
-                    row.style.transform = '';
-                    row.style.transition = '';
-                    const bg = row.nextElementSibling;
-                    if (bg && bg.classList.contains('swipe-rush-bg')) bg.remove();
-                }, 200);
+                row.style.transform = 'translateX(120px)';
+
+                const bg = row.nextElementSibling;
+                if (bg && bg.classList.contains('swipe-type-bg')) {
+                    const id = Number(row.dataset.id);
+                    const stop = stops.find(s => s.id === id);
+
+                    const closePanel = (newType) => {
+                        if (stop && newType !== undefined) {
+                            stop.type = newType;
+                            // Update circle color
+                            const numEl = row.querySelector('.stop-number');
+                            if (numEl) {
+                                numEl.classList.remove('stop-num-bus', 'stop-num-res');
+                                if (newType === 'bus') numEl.classList.add('stop-num-bus');
+                                else if (newType === 'res') numEl.classList.add('stop-num-res');
+                            }
+                            // Update row border
+                            row.classList.remove('row-default', 'row-bus', 'row-res');
+                            if (newType === 'bus') row.classList.add('row-bus');
+                            else if (newType === 'res') row.classList.add('row-res');
+                            else row.classList.add('row-default');
+                        }
+                        // Snap back
+                        row.style.transition = 'transform 0.2s ease';
+                        row.style.transform = 'translateX(0)';
+                        setTimeout(() => {
+                            row.style.transform = '';
+                            row.style.transition = '';
+                            if (bg) bg.remove();
+                        }, 200);
+                    };
+
+                    bg.querySelector('.swipe-bus-btn').onclick = () => closePanel('bus');
+                    bg.querySelector('.swipe-res-btn').onclick = () => closePanel('res');
+                    bg.querySelector('.swipe-none-btn').onclick = () => closePanel('none');
+                }
             } else {
                 // Snap back
                 row.style.transition = 'transform 0.2s ease';
@@ -845,8 +855,8 @@
                     row.style.transition = '';
                     const bg = row.previousElementSibling;
                     if (bg && bg.classList.contains('swipe-delete-bg')) bg.remove();
-                    const rushBg = row.nextElementSibling;
-                    if (rushBg && rushBg.classList.contains('swipe-rush-bg')) rushBg.remove();
+                    const typeBg = row.nextElementSibling;
+                    if (typeBg && typeBg.classList.contains('swipe-type-bg')) typeBg.remove();
                 }, 200);
             }
         });
