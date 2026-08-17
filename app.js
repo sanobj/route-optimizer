@@ -1469,6 +1469,15 @@
             if (isLast) {
                 color = '#ea4335';
                 markerType = 'end';
+                // In No End mode, last stop is a user stop — check for rush/type
+                if (endMode === 'none') {
+                    const lastGeoStop = finalOrder[finalOrder.length - 1];
+                    if (lastGeoStop && lastGeoStop.stop) {
+                        if (lastGeoStop.stop.rush) isRush = true;
+                        if (lastGeoStop.stop.type === 'bus') { color = '#ff8c00'; markerType = 'bus'; }
+                        else if (lastGeoStop.stop.type === 'res') { color = '#9c27b0'; markerType = 'res'; }
+                    }
+                }
             } else {
                 // Match to finalOrder stop
                 const geoStop = finalOrder[stopIdx];
@@ -1913,6 +1922,13 @@
             if (isLast) {
                 color = '#ea4335'; // red for end
                 markerType = 'end';
+                // In No End mode, the last stop is a user stop — check for rush
+                if (endMode === 'none') {
+                    const lastStop = stops[stops.length - 1];
+                    if (lastStop && lastStop.rush) isRush = true;
+                    if (lastStop && lastStop.type === 'bus') { color = '#ff8c00'; markerType = 'bus'; }
+                    else if (lastStop && lastStop.type === 'res') { color = '#9c27b0'; markerType = 'res'; }
+                }
             } else {
                 // Match stop type by index in the reordered stops array
                 const stop = stops[i];
