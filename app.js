@@ -1500,6 +1500,29 @@
         });
         map.fitBounds(bounds);
 
+        // Reorder the stops list to match the optimized route order
+        const optimizedAddresses = allLegs.slice(0, -1).map(item => item.leg.end_address);
+        if (optimizedAddresses.length > 0) {
+            const hasNoEnd = !document.querySelector('.end-input-row:not(.hidden)') && endMode === 'none';
+            reorderStopsToMatch(optimizedAddresses, hasNoEnd);
+        }
+        // Update start input
+        if (allLegs.length > 0) {
+            startInput.value = allLegs[0].leg.start_address;
+        }
+        // Update last stop address in No End mode
+        if (endMode === 'none' && allLegs.length > 0) {
+            const lastFilledStop = stops.filter(s => s.address.trim().length > 0).pop();
+            if (lastFilledStop) {
+                lastFilledStop.address = allLegs[allLegs.length - 1].leg.end_address;
+                const lastInput = stopsContainer.querySelector(`[data-id="${lastFilledStop.id}"] .stop-input`);
+                if (lastInput) lastInput.value = lastFilledStop.address;
+            }
+        }
+        if (endMode === 'address') {
+            endInput.value = allLegs[allLegs.length - 1].leg.end_address;
+        }
+
         // Summary
         const distanceMiles = (totalDistance / 1609.34).toFixed(1);
         const hours = Math.floor(totalDuration / 3600);
