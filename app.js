@@ -1411,8 +1411,12 @@
                 totalDistance += leg.distance.value;
                 totalDuration += leg.duration.value;
             });
+        });
 
-            // Draw polylines for this batch
+        // Draw polylines for each batch with type colors
+        let polylineStopIdx = 0;
+        batchResults.forEach((batch, bIdx) => {
+            const route = batch.result.routes[0];
             route.legs.forEach((leg, i) => {
                 const path = [];
                 leg.steps.forEach(step => {
@@ -1422,14 +1426,29 @@
                 });
                 const polylinePath = path.length > 0 ? path : [leg.start_location, leg.end_location];
 
+                // Determine color based on the stop this leg leads to
+                let strokeColor = '#4285F4';
+                let legType = 'none';
+                const isLastLeg = (bIdx === batchResults.length - 1) && (i === route.legs.length - 1);
+                if (!isLastLeg && polylineStopIdx < finalOrder.length) {
+                    const geoStop = finalOrder[polylineStopIdx];
+                    if (geoStop && geoStop.stop) {
+                        if (geoStop.stop.type === 'bus') { strokeColor = '#ff8c00'; legType = 'bus'; }
+                        else if (geoStop.stop.type === 'res') { strokeColor = '#9c27b0'; legType = 'res'; }
+                    }
+                    polylineStopIdx++;
+                } else {
+                    legType = 'end';
+                }
+
                 const polyline = new google.maps.Polyline({
                     path: polylinePath,
-                    strokeColor: '#4285F4',
+                    strokeColor: strokeColor,
                     strokeOpacity: 0.8,
                     strokeWeight: 5,
                     map: map,
                 });
-                window._routePolylines.push({ polyline, type: 'none' });
+                window._routePolylines.push({ polyline, type: legType });
             });
         });
 
@@ -1437,13 +1456,39 @@
         const firstLeg = allLegs[0].leg;
         addCustomMarker(firstLeg.start_location, '📍', 'Start');
 
-        // Add numbered markers for each stop
+        // Add numbered markers for each stop with type/rush colors
         let stopNum = 1;
+        let stopIdx = 0;
         allLegs.forEach((item, i) => {
             const isLast = i === allLegs.length - 1;
             const label = isLast ? '●' : String(stopNum);
-            const color = isLast ? '#ea4335' : '#1a73e8';
-            addNumberedMarker(item.leg.end_location, label, color, item.leg.end_address, 'none', false);
+            let color;
+            let markerType = 'none';
+            let isRush = false;
+
+            if (isLast) {
+                color = '#ea4335';
+                markerType = 'end';
+            } else {
+                // Match to finalOrder stop
+                const geoStop = finalOrder[stopIdx];
+                if (geoStop && geoStop.stop) {
+                    if (geoStop.stop.type === 'bus') {
+                        color = '#ff8c00';
+                        markerType = 'bus';
+                    } else if (geoStop.stop.type === 'res') {
+                        color = '#9c27b0';
+                        markerType = 'res';
+                    } else {
+                        color = '#1a73e8';
+                    }
+                    isRush = !!geoStop.stop.rush;
+                } else {
+                    color = '#1a73e8';
+                }
+                stopIdx++;
+            }
+            addNumberedMarker(item.leg.end_location, label, color, item.leg.end_address, markerType, isRush);
             if (!isLast) stopNum++;
         });
 
