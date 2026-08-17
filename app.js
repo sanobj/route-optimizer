@@ -1007,6 +1007,13 @@
         // Use sortedFilledStops for optimization
         const stopsForOptimize = sortedFilledStops;
 
+        // If more than 23 waypoints, use batched optimization
+        const MAX_WAYPOINTS = 23;
+        if (stopsForOptimize.length > MAX_WAYPOINTS) {
+            batchedOptimize(origin, destination, stopsForOptimize);
+            return;
+        }
+
         if (destination === null) {
             // No end mode: use last waypoint as destination, optimize the rest
             if (stopsForOptimize.length === 1) {
@@ -1195,6 +1202,356 @@
 
         // Now make one final directions call with the fully ordered waypoints (no optimization)
         runDirections(origin, destination, finalWaypoints, false);
+    }
+
+    // ===== BATCHED OPTIMIZATION (25+ stops) =====
+    async function batchedOptimize(origin, destination, stopsForOptimize) {
+        const MAX_WAYPOINTS = 23;
+
+        // Step 1: Geocode all stops to get coordinates
+        const geocoder = new google.maps.Geocoder();
+        const geocodePromises = stopsForOptimize.map(stop => {
+            return new Promise((resolve) => {
+                geocoder.geocode({ address: stop.address.trim() }, (results, status) => {
+                    if (status === 'OK' && results[0]) {
+                        resolve({
+                            stop: stop,
+                            lat: results[0].geometry.location.lat(),
+                            lng: results[0].geometry.location.lng(),
+                        });
+                    } else {
+                        // Fallback: no coordinates, place at end
+                        resolve({ stop: stop, lat: null, lng: null });
+                    }
+                });
+            });
+        });
+
+        // Also geocode origin
+        const originGeo = await new Promise((resolve) => {
+            geocoder.geocode({ address: origin }, (results, status) => {
+                if (status === 'OK' && results[0]) {
+                    resolve({ lat: results[0].geometry.location.lat(), lng: results[0].geometry.location.lng() });
+                } else {
+                    resolve({ lat: 0, lng: 0 });
+                }
+            });
+        });
+
+        const geoStops = await Promise.all(geocodePromises);
+
+        // Step 2: Nearest-neighbor sort within type groups
+        // Separate pinned stops (keep in place) from unpinned
+        const pinned = geoStops.filter(g => g.stop.pinned);
+        const unpinned = geoStops.filter(g => !g.stop.pinned);
+
+        // Sort unpinned by type (bus first, then none, then res)
+        const unpinnedBus = unpinned.filter(g => g.stop.type === 'bus');
+        const unpinnedNone = unpinned.filter(g => !g.stop.type || g.stop.type === 'none');
+        const unpinnedRes = unpinned.filter(g => g.stop.type === 'res');
+
+        // Apply nearest-neighbor within each type group
+        function nearestNeighborSort(items, startLat, startLng) {
+            const sorted = [];
+            const remaining = [...items];
+            let currentLat = startLat;
+            let currentLng = startLng;
+
+            while (remaining.length > 0) {
+                let nearestIdx = 0;
+                let nearestDist = Infinity;
+
+                for (let i = 0; i < remaining.length; i++) {
+                    if (remaining[i].lat === null) continue;
+                    const dist = Math.pow(remaining[i].lat - currentLat, 2) + Math.pow(remaining[i].lng - currentLng, 2);
+                    if (dist < nearestDist) {
+                        nearestDist = dist;
+                        nearestIdx = i;
+                    }
+                }
+
+                const nearest = remaining.splice(nearestIdx, 1)[0];
+                sorted.push(nearest);
+                if (nearest.lat !== null) {
+                    currentLat = nearest.lat;
+                    currentLng = nearest.lng;
+                }
+            }
+            return sorted;
+        }
+
+        // Sort each type group by nearest-neighbor
+        let lastLat = originGeo.lat;
+        let lastLng = originGeo.lng;
+
+        const sortedBus = nearestNeighborSort(unpinnedBus, lastLat, lastLng);
+        if (sortedBus.length > 0) {
+            const lastBus = sortedBus[sortedBus.length - 1];
+            if (lastBus.lat) { lastLat = lastBus.lat; lastLng = lastBus.lng; }
+        }
+
+        const sortedNone = nearestNeighborSort(unpinnedNone, lastLat, lastLng);
+        if (sortedNone.length > 0) {
+            const lastNone = sortedNone[sortedNone.length - 1];
+            if (lastNone.lat) { lastLat = lastNone.lat; lastLng = lastNone.lng; }
+        }
+
+        const sortedRes = nearestNeighborSort(unpinnedRes, lastLat, lastLng);
+
+        // Combine: bus → none → res (all nearest-neighbor sorted)
+        const allSorted = [...sortedBus, ...sortedNone, ...sortedRes];
+
+        // Reinsert pinned stops at their original positions
+        const finalOrder = [];
+        let sortedIdx = 0;
+        for (let i = 0; i < geoStops.length; i++) {
+            if (geoStops[i].stop.pinned) {
+                finalOrder.push(geoStops[i]);
+            } else {
+                finalOrder.push(allSorted[sortedIdx++]);
+            }
+        }
+
+        // Step 3: Split into batches
+        const batches = [];
+        for (let i = 0; i < finalOrder.length; i += MAX_WAYPOINTS) {
+            batches.push(finalOrder.slice(i, i + MAX_WAYPOINTS));
+        }
+
+        // Step 4: Optimize each batch via Directions API
+        const directionsService = new google.maps.DirectionsService();
+        const batchResults = [];
+        let batchOrigin = origin;
+
+        for (let b = 0; b < batches.length; b++) {
+            const batch = batches[b];
+            const isLastBatch = b === batches.length - 1;
+
+            // Determine batch destination
+            let batchDest;
+            if (isLastBatch) {
+                if (destination) {
+                    batchDest = destination;
+                } else {
+                    // No end mode: last stop is destination
+                    batchDest = batch[batch.length - 1].stop.address.trim();
+                    batch.pop(); // Remove from waypoints
+                }
+            } else {
+                // Use last stop of this batch as destination (bridge to next batch)
+                batchDest = batch[batch.length - 1].stop.address.trim();
+                batch.pop();
+            }
+
+            const waypoints = batch.map(g => g.stop.address.trim());
+
+            const result = await new Promise((resolve) => {
+                directionsService.route({
+                    origin: batchOrigin,
+                    destination: batchDest,
+                    waypoints: waypoints.map(addr => ({ location: addr, stopover: true })),
+                    optimizeWaypoints: true,
+                    travelMode: google.maps.TravelMode.DRIVING,
+                }, (res, status) => {
+                    if (status === google.maps.DirectionsStatus.OK) {
+                        resolve(res);
+                    } else {
+                        console.error('Batch', b + 1, 'failed:', status);
+                        resolve(null);
+                    }
+                });
+            });
+
+            if (result) {
+                batchResults.push({ result, batchOrigin, batchDest, batchStops: batch });
+            }
+
+            // Next batch starts where this one ends
+            batchOrigin = batchDest;
+        }
+
+        // Step 5: Display all batches on map
+        if (batchResults.length > 0) {
+            displayBatchedRoute(batchResults, origin, finalOrder);
+        } else {
+            alert('Route optimization failed. Please try fewer stops.');
+        }
+
+        optimizeBtn.innerHTML = 'Optimize Route';
+        optimizeBtn.disabled = false;
+        updateOptimizeButton();
+    }
+
+    // Display batched route results
+    function displayBatchedRoute(batchResults, origin, finalOrder) {
+        mapContainer.classList.add('active');
+
+        // Clear old markers and polylines
+        if (window._routeMarkers) {
+            window._routeMarkers.forEach(m => m.marker.setMap(null));
+        }
+        window._routeMarkers = [];
+        if (window._routePolylines) {
+            window._routePolylines.forEach(p => p.polyline.setMap(null));
+        }
+        window._routePolylines = [];
+        if (directionsRenderer) {
+            directionsRenderer.setDirections({ routes: [] });
+        }
+
+        // Combine all legs from all batches
+        let allLegs = [];
+        let totalDistance = 0;
+        let totalDuration = 0;
+
+        batchResults.forEach((batch, bIdx) => {
+            const route = batch.result.routes[0];
+            route.legs.forEach((leg, i) => {
+                allLegs.push({ leg, batchIdx: bIdx });
+                totalDistance += leg.distance.value;
+                totalDuration += leg.duration.value;
+            });
+
+            // Draw polylines for this batch
+            route.legs.forEach((leg, i) => {
+                const path = [];
+                leg.steps.forEach(step => {
+                    if (google.maps.geometry) {
+                        google.maps.geometry.encoding.decodePath(step.polyline.points).forEach(p => path.push(p));
+                    }
+                });
+                const polylinePath = path.length > 0 ? path : [leg.start_location, leg.end_location];
+
+                const polyline = new google.maps.Polyline({
+                    path: polylinePath,
+                    strokeColor: '#4285F4',
+                    strokeOpacity: 0.8,
+                    strokeWeight: 5,
+                    map: map,
+                });
+                window._routePolylines.push({ polyline, type: 'none' });
+            });
+        });
+
+        // Add start marker
+        const firstLeg = allLegs[0].leg;
+        addCustomMarker(firstLeg.start_location, '📍', 'Start');
+
+        // Add numbered markers for each stop
+        let stopNum = 1;
+        allLegs.forEach((item, i) => {
+            const isLast = i === allLegs.length - 1;
+            const label = isLast ? '●' : String(stopNum);
+            const color = isLast ? '#ea4335' : '#1a73e8';
+            addNumberedMarker(item.leg.end_location, label, color, item.leg.end_address, 'none', false);
+            if (!isLast) stopNum++;
+        });
+
+        // Fit map to show all markers
+        const bounds = new google.maps.LatLngBounds();
+        allLegs.forEach(item => {
+            bounds.extend(item.leg.start_location);
+            bounds.extend(item.leg.end_location);
+        });
+        map.fitBounds(bounds);
+
+        // Summary
+        const distanceMiles = (totalDistance / 1609.34).toFixed(1);
+        const hours = Math.floor(totalDuration / 3600);
+        const minutes = Math.round((totalDuration % 3600) / 60);
+        const timeStr = hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
+
+        // Breakdown
+        let breakdownHtml = '<div class="route-breakdown hidden">';
+        breakdownHtml += `<div class="breakdown-stop"><span class="breakdown-label breakdown-start">Start</span> ${firstLeg.start_address}</div>`;
+        let legNum = 1;
+        allLegs.forEach((item, i) => {
+            const isLast = i === allLegs.length - 1;
+            breakdownHtml += `<div class="breakdown-arrow">↓ ${item.leg.distance.text} · ${item.leg.duration.text}</div>`;
+            const label = isLast ? 'End' : `${legNum}`;
+            const cls = isLast ? 'breakdown-end' : '';
+            breakdownHtml += `<div class="breakdown-stop"><span class="breakdown-label ${cls}">${label}</span> ${item.leg.end_address}</div>`;
+            if (!isLast) legNum++;
+        });
+        breakdownHtml += '</div>';
+
+        routeSummary.innerHTML = `
+            <div class="summary-stats">
+                <div class="stat">
+                    <div class="stat-value">${timeStr}</div>
+                    <div class="stat-label">Total Time</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value">${distanceMiles} mi</div>
+                    <div class="stat-label">Total Distance</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value">${allLegs.length}</div>
+                    <div class="stat-label">Stops</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value">${batchResults.length}</div>
+                    <div class="stat-label">Routes</div>
+                </div>
+            </div>
+            <div class="summary-expand-hint">Tap for breakdown ▾</div>
+            ${breakdownHtml}
+        `;
+        routeSummary.classList.remove('hidden');
+        routeSummary.onclick = () => {
+            const breakdown = routeSummary.querySelector('.route-breakdown');
+            const hint = routeSummary.querySelector('.summary-expand-hint');
+            if (breakdown) {
+                breakdown.classList.toggle('hidden');
+                hint.textContent = breakdown.classList.contains('hidden') ? 'Tap for breakdown ▾' : 'Tap to collapse ▴';
+            }
+        };
+
+        // Multiple navigation links
+        const navHtml = batchResults.map((batch, i) => {
+            const r = batch.result.routes[0];
+            const legs = r.legs;
+            const bOrigin = legs[0].start_address;
+            const bDest = legs[legs.length - 1].end_address;
+            const bWaypoints = legs.slice(0, -1).map(l => l.end_address);
+            let url = `https://www.google.com/maps/dir/?api=1`;
+            url += `&origin=${encodeURIComponent(bOrigin)}`;
+            url += `&destination=${encodeURIComponent(bDest)}`;
+            if (bWaypoints.length > 0) {
+                url += `&waypoints=${bWaypoints.map(w => encodeURIComponent(w)).join('|')}`;
+            }
+            url += `&travelmode=driving`;
+            return `<button class="btn btn-navigate" onclick="window.open('${url}', '_blank')">Route ${i + 1} of ${batchResults.length} — Google Maps</button>`;
+        }).join('');
+
+        resultActions.innerHTML = navHtml + `<button id="save-route-btn" class="btn btn-save" onclick="window._saveCurrentRoute()">💾 Save Route</button>`;
+        resultActions.classList.remove('hidden');
+
+        if (mapFilterRow && advancedUI) mapFilterRow.classList.remove('hidden');
+
+        // Save optimized route for single-route navigation fallback
+        optimizedRoute = {
+            origin: firstLeg.start_address,
+            destination: allLegs[allLegs.length - 1].leg.end_address,
+            waypoints: allLegs.slice(0, -1).map(item => item.leg.end_address),
+        };
+
+        // Auto-save to history
+        const filledStopsForHistory = stops.filter(s => s.address.trim().length > 0);
+        saveToHistory({
+            origin: firstLeg.start_address,
+            destination: allLegs[allLegs.length - 1].leg.end_address,
+            stops: filledStopsForHistory.map(s => ({ address: s.address, pinned: s.pinned, type: s.type, rush: !!s.rush })),
+            totalTime: timeStr,
+            totalDistance: distanceMiles + ' mi',
+            timestamp: Date.now(),
+            endMode: endMode,
+        });
+
+        if (!suppressScroll) {
+            mapContainer.scrollIntoView({ behavior: 'smooth' });
+        }
+        suppressScroll = false;
     }
 
     function runDirections(origin, destination, waypoints, optimize) {
@@ -1861,6 +2218,7 @@
     // Expose to onclick handlers
     window._loadRoute = loadRoute;
     window._deleteRoute = deleteRoute;
+    window._saveCurrentRoute = saveCurrentRoute;
 
     // ===== ROUTE HISTORY =====
     function getHistory() {
