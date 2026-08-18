@@ -1413,7 +1413,29 @@
             });
         });
 
+        // Reorder the stops list to match the optimized route order
+        const optimizedAddresses = allLegs.slice(0, -1).map(item => item.leg.end_address);
+        if (optimizedAddresses.length > 0) {
+            const hasNoEnd = endMode === 'none';
+            reorderStopsToMatch(optimizedAddresses, hasNoEnd);
+        }
+        if (allLegs.length > 0) {
+            startInput.value = allLegs[0].leg.start_address;
+        }
+        if (endMode === 'none' && allLegs.length > 0) {
+            const lastFilledStop = stops.filter(s => s.address.trim().length > 0).pop();
+            if (lastFilledStop) {
+                lastFilledStop.address = allLegs[allLegs.length - 1].leg.end_address;
+                const lastInput = stopsContainer.querySelector(`[data-id="${lastFilledStop.id}"] .stop-input`);
+                if (lastInput) lastInput.value = lastFilledStop.address;
+            }
+        }
+        if (endMode === 'address') {
+            endInput.value = allLegs[allLegs.length - 1].leg.end_address;
+        }
+
         // Draw polylines for each batch with type colors
+        const filledStopsAfterReorder = stops.filter(s => s.address.trim().length > 0);
         let polylineStopIdx = 0;
         batchResults.forEach((batch, bIdx) => {
             const route = batch.result.routes[0];
@@ -1429,16 +1451,13 @@
                 // Determine color based on the stop this leg leads to
                 let strokeColor = '#4285F4';
                 let legType = 'none';
-                const isLastLeg = (bIdx === batchResults.length - 1) && (i === route.legs.length - 1);
-                if (!isLastLeg && polylineStopIdx < finalOrder.length) {
-                    const geoStop = finalOrder[polylineStopIdx];
-                    if (geoStop && geoStop.stop) {
-                        if (geoStop.stop.type === 'bus') { strokeColor = '#ff8c00'; legType = 'bus'; }
-                        else if (geoStop.stop.type === 'res') { strokeColor = '#9c27b0'; legType = 'res'; }
+                if (polylineStopIdx < filledStopsAfterReorder.length) {
+                    const stop = filledStopsAfterReorder[polylineStopIdx];
+                    if (stop) {
+                        if (stop.type === 'bus') { strokeColor = '#ff8c00'; legType = 'bus'; }
+                        else if (stop.type === 'res') { strokeColor = '#9c27b0'; legType = 'res'; }
                     }
                     polylineStopIdx++;
-                } else {
-                    legType = 'end';
                 }
 
                 const polyline = new google.maps.Polyline({
@@ -1458,7 +1477,6 @@
 
         // Add numbered markers for each stop with type/rush colors
         let stopNum = 1;
-        let stopIdx = 0;
         allLegs.forEach((item, i) => {
             const isLast = i === allLegs.length - 1;
             const label = isLast ? '●' : String(stopNum);
@@ -1471,31 +1489,30 @@
                 markerType = 'end';
                 // In No End mode, last stop is a user stop — check for rush/type
                 if (endMode === 'none') {
-                    const lastGeoStop = finalOrder[finalOrder.length - 1];
-                    if (lastGeoStop && lastGeoStop.stop) {
-                        if (lastGeoStop.stop.rush) isRush = true;
-                        if (lastGeoStop.stop.type === 'bus') { color = '#ff8c00'; markerType = 'bus'; }
-                        else if (lastGeoStop.stop.type === 'res') { color = '#9c27b0'; markerType = 'res'; }
+                    const lastStop = filledStopsAfterReorder[filledStopsAfterReorder.length - 1];
+                    if (lastStop) {
+                        if (lastStop.rush) isRush = true;
+                        if (lastStop.type === 'bus') { color = '#ff8c00'; markerType = 'bus'; }
+                        else if (lastStop.type === 'res') { color = '#9c27b0'; markerType = 'res'; }
                     }
                 }
             } else {
-                // Match to finalOrder stop
-                const geoStop = finalOrder[stopIdx];
-                if (geoStop && geoStop.stop) {
-                    if (geoStop.stop.type === 'bus') {
+                // Match to reordered stops array
+                const stop = filledStopsAfterReorder[i];
+                if (stop) {
+                    if (stop.type === 'bus') {
                         color = '#ff8c00';
                         markerType = 'bus';
-                    } else if (geoStop.stop.type === 'res') {
+                    } else if (stop.type === 'res') {
                         color = '#9c27b0';
                         markerType = 'res';
                     } else {
                         color = '#1a73e8';
                     }
-                    isRush = !!geoStop.stop.rush;
+                    isRush = !!stop.rush;
                 } else {
                     color = '#1a73e8';
                 }
-                stopIdx++;
             }
             addNumberedMarker(item.leg.end_location, label, color, item.leg.end_address, markerType, isRush);
             if (!isLast) stopNum++;
@@ -1508,29 +1525,6 @@
             bounds.extend(item.leg.end_location);
         });
         map.fitBounds(bounds);
-
-        // Reorder the stops list to match the optimized route order
-        const optimizedAddresses = allLegs.slice(0, -1).map(item => item.leg.end_address);
-        if (optimizedAddresses.length > 0) {
-            const hasNoEnd = !document.querySelector('.end-input-row:not(.hidden)') && endMode === 'none';
-            reorderStopsToMatch(optimizedAddresses, hasNoEnd);
-        }
-        // Update start input
-        if (allLegs.length > 0) {
-            startInput.value = allLegs[0].leg.start_address;
-        }
-        // Update last stop address in No End mode
-        if (endMode === 'none' && allLegs.length > 0) {
-            const lastFilledStop = stops.filter(s => s.address.trim().length > 0).pop();
-            if (lastFilledStop) {
-                lastFilledStop.address = allLegs[allLegs.length - 1].leg.end_address;
-                const lastInput = stopsContainer.querySelector(`[data-id="${lastFilledStop.id}"] .stop-input`);
-                if (lastInput) lastInput.value = lastFilledStop.address;
-            }
-        }
-        if (endMode === 'address') {
-            endInput.value = allLegs[allLegs.length - 1].leg.end_address;
-        }
 
         // Summary
         const distanceMiles = (totalDistance / 1609.34).toFixed(1);
