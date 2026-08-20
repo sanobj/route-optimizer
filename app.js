@@ -1301,14 +1301,21 @@
         // Combine: bus → none → res (all nearest-neighbor sorted)
         const allSorted = [...sortedBus, ...sortedNone, ...sortedRes];
 
-        // Reinsert pinned stops at their original positions
-        const finalOrder = [];
+        // Build final order: pinned stops at their absolute positions, sorted stops fill the gaps
+        const finalOrder = new Array(geoStops.length).fill(null);
+        
+        // First, place pinned stops at their original user positions
+        geoStops.forEach((g, i) => {
+            if (g.stop.pinned) {
+                finalOrder[i] = g;
+            }
+        });
+        
+        // Fill remaining slots with sorted unpinned stops
         let sortedIdx = 0;
-        for (let i = 0; i < geoStops.length; i++) {
-            if (geoStops[i].stop.pinned) {
-                finalOrder.push(geoStops[i]);
-            } else {
-                finalOrder.push(allSorted[sortedIdx++]);
+        for (let i = 0; i < finalOrder.length; i++) {
+            if (finalOrder[i] === null) {
+                finalOrder[i] = allSorted[sortedIdx++];
             }
         }
 
@@ -1350,7 +1357,7 @@
                     origin: batchOrigin,
                     destination: batchDest,
                     waypoints: waypoints.map(addr => ({ location: addr, stopover: true })),
-                    optimizeWaypoints: true,
+                    optimizeWaypoints: false,
                     travelMode: google.maps.TravelMode.DRIVING,
                 }, (res, status) => {
                     if (status === google.maps.DirectionsStatus.OK) {
