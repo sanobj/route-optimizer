@@ -1067,55 +1067,104 @@
             return;
         }
 
-        // No pins: let Google optimize all stops together, then reorder result
+        // No pins: optimize each type group separately
         const directionsService = new google.maps.DirectionsService();
-        directionsService.route({
-            origin: origin,
-            destination: destination,
-            waypoints: allAddresses.map(addr => ({ location: addr, stopover: true })),
-            optimizeWaypoints: true,
-            travelMode: google.maps.TravelMode.DRIVING,
-        }, (result, status) => {
-            if (status !== google.maps.DirectionsStatus.OK) {
-                handleDirectionsError(status);
-                optimizeBtn.innerHTML = 'Optimize Route';
-                optimizeBtn.disabled = false;
-                return;
-            }
-
-            if (!hasMixedTypes) {
-                // No mixed types, just display as-is
-                try { displayRoute(result, origin, allAddresses); } catch(e) { console.error(e); }
-                optimizeBtn.innerHTML = 'Optimize Route';
-                optimizeBtn.disabled = false;
-                updateOptimizeButton();
-                return;
-            }
-
-            // Mixed types: get Google's optimized order, then re-sort so bus comes first
-            const waypointOrder = result.routes[0].waypoint_order;
-            const optimizedStops = waypointOrder.map(i => filledStops[i]);
-            
-            // Separate into bus and non-bus groups preserving Google's optimized order within each
-            const optimizedBus = optimizedStops.filter(s => s.type === 'bus');
-            const optimizedOther = optimizedStops.filter(s => s.type !== 'bus');
-            const reorderedStops = [...optimizedBus, ...optimizedOther];
-            const reorderedAddresses = reorderedStops.map(s => s.address.trim());
-
-            // Make a second call with the reordered stops (no optimization, just route in this order)
+        
+        if (!hasMixedTypes) {
+            // All same type — just let Google optimize everything
             directionsService.route({
                 origin: origin,
                 destination: destination,
-                waypoints: reorderedAddresses.map(addr => ({ location: addr, stopover: true })),
+                waypoints: allAddresses.map(addr => ({ location: addr, stopover: true })),
+                optimizeWaypoints: true,
+                travelMode: google.maps.TravelMode.DRIVING,
+            }, (result, status) => {
+                if (status === google.maps.DirectionsStatus.OK) {
+                    try { displayRoute(result, origin, allAddresses); } catch(e) { console.error(e); }
+                } else { handleDirectionsError(status); }
+                optimizeBtn.innerHTML = 'Optimize Route';
+                optimizeBtn.disabled = false;
+                updateOptimizeButton();
+            });
+            return;
+        }
+
+        // Mixed types: optimize bus group from origin, then res group from last business
+        const busStops = filledStops.filter(s => s.type === 'bus');
+        const otherStops = filledStops.filter(s => s.type !== 'bus');
+        const busAddresses = busStops.map(s => s.address.trim());
+        const otherAddresses = otherStops.map(s => s.address.trim());
+
+        // Optimize businesses from origin (Google picks best order)
+        if (busAddresses.length <= 1) {
+            finishMixedRoute(directionsService, origin, destination, busAddresses, otherAddresses);
+        } else {
+            // Optimize bus group from origin
+            directionsService.route({
+                origin: origin,
+                destination: busAddresses[0],
+                waypoints: busAddresses.slice(1).map(addr => ({ location: addr, stopover: true })),
+                optimizeWaypoints: true,
+                travelMode: google.maps.TravelMode.DRIVING,
+            }, (busResult, busStatus) => {
+                let orderedBus = busAddresses;
+                if (busStatus === google.maps.DirectionsStatus.OK) {
+                    const legs = busResult.routes[0].legs;
+                    orderedBus = legs.map(l => l.end_address);
+                }
+                finishMixedRoute(directionsService, origin, destination, orderedBus, otherAddresses);
+            });
+        }
+    }
+
+    function finishMixedRoute(directionsService, origin, destination, orderedBus, otherAddresses) {
+        const lastBus = orderedBus.length > 0 ? orderedBus[orderedBus.length - 1] : origin;
+        
+        if (otherAddresses.length === 0) {
+            // Only bus stops
+            directionsService.route({
+                origin: origin,
+                destination: destination,
+                waypoints: orderedBus.map(addr => ({ location: addr, stopover: true })),
                 optimizeWaypoints: false,
                 travelMode: google.maps.TravelMode.DRIVING,
-            }, (result2, status2) => {
-                if (status2 === google.maps.DirectionsStatus.OK) {
-                    try { displayRoute(result2, origin, reorderedAddresses); } catch(e) { console.error(e); }
-                } else {
-                    // Fallback to original result
-                    try { displayRoute(result, origin, allAddresses); } catch(e) { console.error(e); }
-                }
+            }, (r, s) => {
+                if (s === google.maps.DirectionsStatus.OK) {
+                    try { displayRoute(r, origin, orderedBus); } catch(e) { console.error(e); }
+                } else { handleDirectionsError(s); }
+                optimizeBtn.innerHTML = 'Optimize Route';
+                optimizeBtn.disabled = false;
+                updateOptimizeButton();
+            });
+            return;
+        }
+
+        // Optimize residences from last business to destination
+        directionsService.route({
+            origin: lastBus,
+            destination: destination,
+            waypoints: otherAddresses.map(addr => ({ location: addr, stopover: true })),
+            optimizeWaypoints: true,
+            travelMode: google.maps.TravelMode.DRIVING,
+        }, (resResult, resStatus) => {
+            let orderedOther = otherAddresses;
+            if (resStatus === google.maps.DirectionsStatus.OK) {
+                const resLegs = resResult.routes[0].legs;
+                orderedOther = resLegs.slice(0, -1).map(l => l.end_address);
+            }
+
+            // Final combined route
+            const finalWaypoints = [...orderedBus, ...orderedOther];
+            directionsService.route({
+                origin: origin,
+                destination: destination,
+                waypoints: finalWaypoints.map(addr => ({ location: addr, stopover: true })),
+                optimizeWaypoints: false,
+                travelMode: google.maps.TravelMode.DRIVING,
+            }, (finalResult, finalStatus) => {
+                if (finalStatus === google.maps.DirectionsStatus.OK) {
+                    try { displayRoute(finalResult, origin, finalWaypoints); } catch(e) { console.error(e); }
+                } else { handleDirectionsError(finalStatus); }
                 optimizeBtn.innerHTML = 'Optimize Route';
                 optimizeBtn.disabled = false;
                 updateOptimizeButton();
