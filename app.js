@@ -1103,15 +1103,17 @@
                 const effectiveType = stopType === 'bus' ? 'bus' : 'other';
 
                 if (currentType !== null && effectiveType !== currentType && currentUnpinned.length > 0) {
-                    // Type boundary — use this stop as the destination of the current segment
+                    // Type boundary — end the current segment
+                    // Use last waypoint as destination so Google optimizes freely within the group
+                    const lastWaypoint = currentUnpinned.pop();
                     segments.push({
                         origin: segStart,
-                        destination: stop.address.trim(),
+                        destination: lastWaypoint,
                         waypoints: currentUnpinned.slice(),
                         optimize: true,
                     });
-                    segStart = stop.address.trim();
-                    currentUnpinned = [];
+                    segStart = lastWaypoint;
+                    currentUnpinned = [stop.address.trim()];
                 } else {
                     currentUnpinned.push(stop.address.trim());
                 }
