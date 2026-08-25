@@ -1099,12 +1099,11 @@
         if (busAddresses.length <= 1) {
             finishMixedRoute(directionsService, origin, destination, busAddresses, otherAddresses);
         } else {
-            // Optimize bus group: find best order from origin toward the residence cluster
-            // Use first non-bus stop as destination hint so businesses route toward residences
-            const busHintDest = otherAddresses[0] || destination;
+            // Optimize bus group: find best order starting from origin
+            // Use origin as both start and "round trip" to get pure proximity-based order
             directionsService.route({
                 origin: origin,
-                destination: busHintDest,
+                destination: origin,
                 waypoints: busAddresses.map(addr => ({ location: addr, stopover: true })),
                 optimizeWaypoints: true,
                 travelMode: google.maps.TravelMode.DRIVING,
