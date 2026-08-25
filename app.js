@@ -1099,18 +1099,19 @@
         if (busAddresses.length <= 1) {
             finishMixedRoute(directionsService, origin, destination, busAddresses, otherAddresses);
         } else {
-            // Optimize bus group from origin
+            // Optimize bus group: use origin as start, final destination as end
+            // Google optimizes the order of businesses between these fixed points
             directionsService.route({
                 origin: origin,
-                destination: busAddresses[0],
-                waypoints: busAddresses.slice(1).map(addr => ({ location: addr, stopover: true })),
+                destination: destination,
+                waypoints: busAddresses.map(addr => ({ location: addr, stopover: true })),
                 optimizeWaypoints: true,
                 travelMode: google.maps.TravelMode.DRIVING,
             }, (busResult, busStatus) => {
                 let orderedBus = busAddresses;
                 if (busStatus === google.maps.DirectionsStatus.OK) {
-                    const legs = busResult.routes[0].legs;
-                    orderedBus = legs.map(l => l.end_address);
+                    const busOrder = busResult.routes[0].waypoint_order;
+                    orderedBus = busOrder.map(i => busAddresses[i]);
                 }
                 finishMixedRoute(directionsService, origin, destination, orderedBus, otherAddresses);
             });
