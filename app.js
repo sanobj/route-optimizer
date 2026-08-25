@@ -1052,9 +1052,79 @@
     }
 
     function optimizeWithPinnedStops(origin, destination, filledStops) {
-        // Strategy: Split into segments at pinned stops AND at bus/res type boundaries.
-        // Each segment is optimized independently by Google.
-        // This ensures businesses are routed before residences.
+        // Strategy: For mixed bus/res types without pins, let Google optimize ALL stops together
+        // for the best overall route, then reorder the result so businesses come first.
+        // For pinned stops, split at pin boundaries and optimize each segment.
+
+        const allAddresses = filledStops.map(s => s.address.trim());
+        const hasPins = filledStops.some(s => s.pinned);
+        const hasMixedTypes = filledStops.some(s => s.type === 'bus') && 
+                              filledStops.some(s => s.type !== 'bus');
+
+        // If there are pinned stops, use segment-based approach
+        if (hasPins) {
+            optimizeWithSegments(origin, destination, filledStops);
+            return;
+        }
+
+        // No pins: let Google optimize all stops together, then reorder result
+        const directionsService = new google.maps.DirectionsService();
+        directionsService.route({
+            origin: origin,
+            destination: destination,
+            waypoints: allAddresses.map(addr => ({ location: addr, stopover: true })),
+            optimizeWaypoints: true,
+            travelMode: google.maps.TravelMode.DRIVING,
+        }, (result, status) => {
+            if (status !== google.maps.DirectionsStatus.OK) {
+                handleDirectionsError(status);
+                optimizeBtn.innerHTML = 'Optimize Route';
+                optimizeBtn.disabled = false;
+                return;
+            }
+
+            if (!hasMixedTypes) {
+                // No mixed types, just display as-is
+                try { displayRoute(result, origin, allAddresses); } catch(e) { console.error(e); }
+                optimizeBtn.innerHTML = 'Optimize Route';
+                optimizeBtn.disabled = false;
+                updateOptimizeButton();
+                return;
+            }
+
+            // Mixed types: get Google's optimized order, then re-sort so bus comes first
+            const waypointOrder = result.routes[0].waypoint_order;
+            const optimizedStops = waypointOrder.map(i => filledStops[i]);
+            
+            // Separate into bus and non-bus groups preserving Google's optimized order within each
+            const optimizedBus = optimizedStops.filter(s => s.type === 'bus');
+            const optimizedOther = optimizedStops.filter(s => s.type !== 'bus');
+            const reorderedStops = [...optimizedBus, ...optimizedOther];
+            const reorderedAddresses = reorderedStops.map(s => s.address.trim());
+
+            // Make a second call with the reordered stops (no optimization, just route in this order)
+            directionsService.route({
+                origin: origin,
+                destination: destination,
+                waypoints: reorderedAddresses.map(addr => ({ location: addr, stopover: true })),
+                optimizeWaypoints: false,
+                travelMode: google.maps.TravelMode.DRIVING,
+            }, (result2, status2) => {
+                if (status2 === google.maps.DirectionsStatus.OK) {
+                    try { displayRoute(result2, origin, reorderedAddresses); } catch(e) { console.error(e); }
+                } else {
+                    // Fallback to original result
+                    try { displayRoute(result, origin, allAddresses); } catch(e) { console.error(e); }
+                }
+                optimizeBtn.innerHTML = 'Optimize Route';
+                optimizeBtn.disabled = false;
+                updateOptimizeButton();
+            });
+        });
+    }
+
+    function optimizeWithSegments(origin, destination, filledStops) {
+        // Segment-based approach for routes with pinned stops
 
         const allAddresses = filledStops.map(s => s.address.trim());
         const unpinnedIndices = filledStops.reduce((acc, s, i) => {
