@@ -1089,60 +1089,75 @@
             return;
         }
 
-        // Mixed types: optimize all together, then move businesses to front
-        directionsService.route({
-            origin: origin,
-            destination: destination,
-            waypoints: allAddresses.map(addr => ({ location: addr, stopover: true })),
-            optimizeWaypoints: true,
-            travelMode: google.maps.TravelMode.DRIVING,
-        }, (result, status) => {
-            if (status !== google.maps.DirectionsStatus.OK) {
-                handleDirectionsError(status);
-                optimizeBtn.innerHTML = 'Optimize Route';
-                optimizeBtn.disabled = false;
-                return;
+        // Mixed types: optimize all together, then move businesses to front (sorted by proximity to origin)
+        // First, geocode origin and businesses to sort by distance
+        const geocoder = new google.maps.Geocoder();
+        const busStops = filledStops.filter(s => s.type === 'bus');
+        const otherStops = filledStops.filter(s => s.type !== 'bus');
+        const busAddresses = busStops.map(s => s.address.trim());
+        const otherAddresses = otherStops.map(s => s.address.trim());
+
+        // Get origin coordinates
+        geocoder.geocode({ address: origin }, (originResults, originStatus) => {
+            let originLat = 0, originLng = 0;
+            if (originStatus === 'OK' && originResults[0]) {
+                originLat = originResults[0].geometry.location.lat();
+                originLng = originResults[0].geometry.location.lng();
             }
 
-            // Get Google's optimal order
-            const waypointOrder = result.routes[0].waypoint_order;
-            const optimizedStops = waypointOrder.map(i => filledStops[i]);
-            
-            // Check if businesses are already first
-            const busCount = filledStops.filter(s => s.type === 'bus').length;
-            const firstNBus = optimizedStops.slice(0, busCount);
-            const allBusFirst = firstNBus.every(s => s.type === 'bus');
-            
-            if (allBusFirst) {
-                // Already optimal with businesses first — use as-is
-                try { displayRoute(result, origin, allAddresses); } catch(e) { console.error(e); }
-                optimizeBtn.innerHTML = 'Optimize Route';
-                optimizeBtn.disabled = false;
-                updateOptimizeButton();
-                return;
-            }
+            // Geocode all businesses to sort by distance from origin
+            const busGeoPromises = busAddresses.map(addr => new Promise(resolve => {
+                geocoder.geocode({ address: addr }, (results, status) => {
+                    if (status === 'OK' && results[0]) {
+                        resolve({ addr, lat: results[0].geometry.location.lat(), lng: results[0].geometry.location.lng() });
+                    } else {
+                        resolve({ addr, lat: originLat, lng: originLng });
+                    }
+                });
+            }));
 
-            // Businesses aren't first — pull them to front preserving relative order
-            const optimizedBus = optimizedStops.filter(s => s.type === 'bus');
-            const optimizedOther = optimizedStops.filter(s => s.type !== 'bus');
-            const reorderedAddresses = [...optimizedBus.map(s => s.address.trim()), ...optimizedOther.map(s => s.address.trim())];
+            Promise.all(busGeoPromises).then(busGeos => {
+                // Sort businesses by distance from origin (closest first)
+                busGeos.sort((a, b) => {
+                    const distA = Math.pow(a.lat - originLat, 2) + Math.pow(a.lng - originLng, 2);
+                    const distB = Math.pow(b.lat - originLat, 2) + Math.pow(b.lng - originLng, 2);
+                    return distA - distB;
+                });
+                const sortedBusAddresses = busGeos.map(g => g.addr);
 
-            // Route with businesses first (no re-optimization, just get directions in this order)
-            directionsService.route({
-                origin: origin,
-                destination: destination,
-                waypoints: reorderedAddresses.map(addr => ({ location: addr, stopover: true })),
-                optimizeWaypoints: false,
-                travelMode: google.maps.TravelMode.DRIVING,
-            }, (result2, status2) => {
-                if (status2 === google.maps.DirectionsStatus.OK) {
-                    try { displayRoute(result2, origin, reorderedAddresses); } catch(e) { console.error(e); }
-                } else {
-                    try { displayRoute(result, origin, allAddresses); } catch(e) { console.error(e); }
-                }
-                optimizeBtn.innerHTML = 'Optimize Route';
-                optimizeBtn.disabled = false;
-                updateOptimizeButton();
+                // Now optimize residences: from last business to destination
+                const lastBus = sortedBusAddresses[sortedBusAddresses.length - 1] || origin;
+                
+                directionsService.route({
+                    origin: lastBus,
+                    destination: destination,
+                    waypoints: otherAddresses.map(addr => ({ location: addr, stopover: true })),
+                    optimizeWaypoints: true,
+                    travelMode: google.maps.TravelMode.DRIVING,
+                }, (resResult, resStatus) => {
+                    let orderedOther = otherAddresses;
+                    if (resStatus === google.maps.DirectionsStatus.OK && resResult.routes[0].waypoint_order) {
+                        const resOrder = resResult.routes[0].waypoint_order;
+                        orderedOther = resOrder.map(i => otherAddresses[i]);
+                    }
+
+                    // Final route: origin → sorted businesses → optimized residences → destination
+                    const finalWaypoints = [...sortedBusAddresses, ...orderedOther];
+                    directionsService.route({
+                        origin: origin,
+                        destination: destination,
+                        waypoints: finalWaypoints.map(addr => ({ location: addr, stopover: true })),
+                        optimizeWaypoints: false,
+                        travelMode: google.maps.TravelMode.DRIVING,
+                    }, (finalResult, finalStatus) => {
+                        if (finalStatus === google.maps.DirectionsStatus.OK) {
+                            try { displayRoute(finalResult, origin, finalWaypoints); } catch(e) { console.error(e); }
+                        } else { handleDirectionsError(finalStatus); }
+                        optimizeBtn.innerHTML = 'Optimize Route';
+                        optimizeBtn.disabled = false;
+                        updateOptimizeButton();
+                    });
+                });
             });
         });
     }
