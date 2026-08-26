@@ -1965,20 +1965,40 @@
         const reordered = [];
         const used = new Set();
 
+        // Helper: extract street portion for fuzzy matching
+        function streetPart(addr) {
+            // Get everything before the first comma (street address)
+            return addr.split(',')[0].trim().toLowerCase();
+        }
+
         orderedAddresses.forEach(addr => {
-            // Find the matching stop (by address, case-insensitive)
-            const match = reorderableStops.find((s, i) => !used.has(i) && s.address.trim().toLowerCase() === addr.toLowerCase());
-            if (match) {
-                used.add(reorderableStops.indexOf(match));
-                match.address = addr; // Update to Google-formatted address
-                reordered.push(match);
+            const addrLower = addr.toLowerCase();
+            const addrStreet = streetPart(addr);
+
+            // Try exact match first
+            let matchIdx = reorderableStops.findIndex((s, i) => !used.has(i) && s.address.trim().toLowerCase() === addrLower);
+            
+            // Try street-part match (handles Google adding/removing city/state/zip)
+            if (matchIdx === -1) {
+                matchIdx = reorderableStops.findIndex((s, i) => !used.has(i) && streetPart(s.address) === addrStreet);
+            }
+
+            // Try contains match (one address contains the other's street)
+            if (matchIdx === -1) {
+                matchIdx = reorderableStops.findIndex((s, i) => !used.has(i) && (addrLower.includes(streetPart(s.address)) || s.address.trim().toLowerCase().includes(addrStreet)));
+            }
+
+            if (matchIdx !== -1) {
+                used.add(matchIdx);
+                reorderableStops[matchIdx].address = addr;
+                reordered.push(reorderableStops[matchIdx]);
             } else {
-                // Fallback: match by next unused stop in order (Google may return different formatting)
-                const partial = reorderableStops.find((s, i) => !used.has(i));
-                if (partial) {
-                    used.add(reorderableStops.indexOf(partial));
-                    partial.address = addr;
-                    reordered.push(partial);
+                // Last resort fallback: next unused stop
+                const fallbackIdx = reorderableStops.findIndex((s, i) => !used.has(i));
+                if (fallbackIdx !== -1) {
+                    used.add(fallbackIdx);
+                    reorderableStops[fallbackIdx].address = addr;
+                    reordered.push(reorderableStops[fallbackIdx]);
                 }
             }
         });
