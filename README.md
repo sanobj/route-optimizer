@@ -1,6 +1,6 @@
 # Route Optimizer PWA
 
-A Progressive Web App that optimizes multi-stop driving routes for the fastest/shortest path. Works on iPhone Safari and can be added to your home screen like a native app.
+A Progressive Web App that optimizes multi-stop driving routes for the fastest/shortest path. Works on iPhone Safari and can be added to your home screen like a native app. Supports 25+ stops with automatic batching.
 
 ## Live App
 
@@ -11,16 +11,27 @@ A Progressive Web App that optimizes multi-stop driving routes for the fastest/s
 - 📍 GPS location detection (shows your street address, not coordinates)
 - 🔍 Address autocomplete powered by Google Places
 - 🗺️ Interactive map with numbered markers (tap a marker to see the address)
-- ⚡ Waypoint optimization (up to 25 stops) — reorders stops in place
+- ⚡ Waypoint optimization — reorders stops in place for fastest route
+- 📦 Auto-batching for 25+ stops (nearest-neighbor pre-sort, split into multiple routes)
 - 📌 Pin stops to lock them in position — only unpinned stops get optimized
 - ☰ Drag to reorder stops manually (hold the handle on mobile)
 - 🔄 End mode options: No End, Round Trip, or custom End Address
 - 📊 Collapsible route breakdown showing distance/time between each stop
 - 💾 Save and load routes with overwrite protection
-- 🕘 Auto-saved route history (optimizations and clears) for easy recovery
+- 🕘 Auto-saved route history (optimizations and clears, expires after 3 days)
 - ✕ Clear button to reset all fields (auto-saves to history first)
+- 🌙 Dark/Light mode toggle
 - 📱 Installable as home screen app (PWA)
 - 🔒 API key stored locally on your device
+
+### Advanced UI (toggle in Settings)
+
+- 🟠 **Business priority** — swipe right on a stop, tap "Bus" to mark. Businesses always route first.
+- 🟣 **Residence** — swipe right, tap "Res". Residences route after all businesses.
+- 🟡 **Rush** — tap the numbered circle to mark as gold/rush for urgency.
+- 🗺️ **Map filter** — All/Bus/Res tabs above the map to view specific types only.
+- 🎨 **Color-coded** route lines, map markers, and breakdown labels by type.
+- 👆 **Swipe left** on addresses, saved routes, or history cards to delete.
 
 ## How It Works
 
@@ -29,10 +40,11 @@ A Progressive Web App that optimizes multi-stop driving routes for the fastest/s
 3. **Add your stops** — type and select from autocomplete suggestions
 4. **Pin any stops** you need in a fixed position (📌 button)
 5. **Drag stops** to reorder manually (hold the ☰ handle on mobile)
-6. **Tap "Optimize Route"** — Google reorders unpinned stops for the fastest route, updating them in place
-7. **Tap the summary bar** to see a breakdown of distance/time between each stop
-8. **Tap "Open in Google Maps"** for turn-by-turn navigation
-9. **Save the route** for later — saving with the same name overwrites, a new name creates a new save
+6. **Tag stops** (Advanced UI): swipe right for Bus/Res, tap circle for Rush
+7. **Tap "Optimize Route"** — reorders stops for the fastest route, businesses first
+8. **Tap the summary bar** to see a breakdown of distance/time between each stop
+9. **Tap "Open in Google Maps"** for turn-by-turn navigation (multiple links for 25+ stop routes)
+10. **Save the route** for later — saving with the same name overwrites, a new name creates a new save
 
 ## Setup
 
@@ -94,9 +106,10 @@ To host your own copy:
 
 ## Limitations
 
-- Maximum 25 waypoints (Google API limit)
+- Google API limits 25 waypoints per request (auto-batched for larger routes)
 - Requires internet connection for route calculation
 - Turn-by-turn navigation handled by Google Maps app
+- Business priority optimization uses nearest-neighbor sorting (may differ slightly from theoretical optimal)
 
 ## Files
 
