@@ -1117,13 +1117,30 @@
             }));
 
             Promise.all(busGeoPromises).then(busGeos => {
-                // Sort businesses by distance from origin (closest first)
-                busGeos.sort((a, b) => {
-                    const distA = Math.pow(a.lat - originLat, 2) + Math.pow(a.lng - originLng, 2);
-                    const distB = Math.pow(b.lat - originLat, 2) + Math.pow(b.lng - originLng, 2);
-                    return distA - distB;
-                });
-                const sortedBusAddresses = busGeos.map(g => g.addr);
+                // Sort businesses using nearest-neighbor chain from origin
+                // (visit closest unvisited business from current position)
+                const sortedBus = [];
+                const remaining = [...busGeos];
+                let curLat = originLat;
+                let curLng = originLng;
+
+                while (remaining.length > 0) {
+                    let nearestIdx = 0;
+                    let nearestDist = Infinity;
+                    for (let i = 0; i < remaining.length; i++) {
+                        const dist = Math.pow(remaining[i].lat - curLat, 2) + Math.pow(remaining[i].lng - curLng, 2);
+                        if (dist < nearestDist) {
+                            nearestDist = dist;
+                            nearestIdx = i;
+                        }
+                    }
+                    const nearest = remaining.splice(nearestIdx, 1)[0];
+                    sortedBus.push(nearest);
+                    curLat = nearest.lat;
+                    curLng = nearest.lng;
+                }
+
+                const sortedBusAddresses = sortedBus.map(g => g.addr);
 
                 // Now optimize residences: from last business to destination
                 const lastBus = sortedBusAddresses[sortedBusAddresses.length - 1] || origin;
