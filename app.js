@@ -174,6 +174,8 @@
         stops = stops.filter(s => s.id !== id);
         const el = stopsContainer.querySelector(`[data-id="${id}"]`);
         if (el) el.remove();
+        // Hide any lingering Google autocomplete dropdown
+        document.querySelectorAll('.pac-container').forEach(c => c.style.display = 'none');
         renumberStops();
         updateOptimizeButton();
     }
