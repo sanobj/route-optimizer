@@ -601,6 +601,11 @@ body {
     background: #9c27b0;
 }
 
+.breakdown-label.breakdown-rush {
+    background: var(--warning);
+    color: #000;
+}
+
 .breakdown-arrow {
     font-size: 0.75rem;
     color: var(--primary);
@@ -954,11 +959,6 @@ body {
 .swipe-res-btn {
     background: #9c27b0;
     color: white;
-}
-
-.swipe-none-btn {
-    background: var(--border);
-    color: var(--text);
 }
 
 .input-row {

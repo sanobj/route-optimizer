@@ -1732,7 +1732,14 @@
             const isLast = i === allLegs.length - 1;
             breakdownHtml += `<div class="breakdown-arrow">↓ ${item.leg.distance.text} · ${item.leg.duration.text}</div>`;
             const label = isLast ? 'End' : `${legNum}`;
-            const cls = isLast ? 'breakdown-end' : '';
+            let cls = isLast ? 'breakdown-end' : '';
+            // Add bus/res/rush color when Advanced UI is on
+            if (!isLast && advancedUI) {
+                const stop = filledStopsAfterReorder[i];
+                if (stop && stop.rush) cls = 'breakdown-rush';
+                else if (stop && stop.type === 'bus') cls = 'breakdown-bus';
+                else if (stop && stop.type === 'res') cls = 'breakdown-res';
+            }
             breakdownHtml += `<div class="breakdown-stop"><span class="breakdown-label ${cls}">${label}</span> ${item.leg.end_address}</div>`;
             if (!isLast) legNum++;
         });
@@ -2221,10 +2228,11 @@
             const isLast = i === legs.length - 1;
             const label = isLast ? 'End' : `${i + 1}`;
             let cls = isLast ? 'breakdown-end' : '';
-            // Add bus/res color to label when Advanced UI is on
+            // Add bus/res/rush color to label when Advanced UI is on
             if (!isLast && advancedUI) {
                 const stop = stops[i];
-                if (stop && stop.type === 'bus') cls = 'breakdown-bus';
+                if (stop && stop.rush) cls = 'breakdown-rush';
+                else if (stop && stop.type === 'bus') cls = 'breakdown-bus';
                 else if (stop && stop.type === 'res') cls = 'breakdown-res';
             }
             breakdownHtml += `<div class="breakdown-stop"><span class="breakdown-label ${cls}">${label}</span> ${leg.end_address}</div>`;
