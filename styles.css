@@ -104,10 +104,12 @@ body {
 }
 
 /* Help modal: a solid header bar (title + X) stays pinned to the top while
-   the body scrolls beneath it, so the X never floats over the text. */
+   the body scrolls beneath it, so the X never floats over the text.
+   It sticks at top:-24px so its own top padding fills the modal's 24px
+   padding gap — otherwise content would peek through above the bar. */
 .help-header {
     position: sticky;
-    top: 0;
+    top: -24px;
     z-index: 3;
     display: flex;
     align-items: center;
@@ -115,7 +117,7 @@ body {
     background: var(--surface);
     /* span the modal's 24px padding so the bar reaches the edges */
     margin: -24px -24px 0;
-    padding: 16px 24px;
+    padding: 24px 24px 16px;
     border-bottom: 1px solid var(--border);
     border-radius: var(--radius) var(--radius) 0 0;
 }
