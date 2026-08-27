@@ -867,11 +867,11 @@ body {
 }
 
 .split-tag.split-above {
-    background: var(--primary);
+    background: var(--success);
 }
 
 .split-tag.split-below {
-    background: #6b7280;
+    background: var(--danger);
 }
 
 /* Map Filter */
