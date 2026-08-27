@@ -439,6 +439,9 @@ body {
     width: 100%;
     max-width: 400px;
     position: relative;
+    max-height: 85vh;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
 }
 
 .modal-content h2 {
