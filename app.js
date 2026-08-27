@@ -320,6 +320,21 @@
         );
     }
 
+    // Help modal (default-feature guide)
+    const helpBtn = document.getElementById('help-btn');
+    const helpModal = document.getElementById('help-modal');
+    const closeHelpBtn = document.getElementById('close-help-btn');
+    const closeHelpBtn2 = document.getElementById('close-help-btn-2');
+    if (helpBtn && helpModal) {
+        helpBtn.addEventListener('click', () => helpModal.classList.remove('hidden'));
+        const closeHelp = () => helpModal.classList.add('hidden');
+        if (closeHelpBtn) closeHelpBtn.addEventListener('click', closeHelp);
+        if (closeHelpBtn2) closeHelpBtn2.addEventListener('click', closeHelp);
+        helpModal.addEventListener('click', (e) => {
+            if (e.target === helpModal) closeHelp();
+        });
+    }
+
     // Settings
     const advancedInfoBtn = document.getElementById('advanced-info-btn');
     const advancedInfo = document.getElementById('advanced-info');

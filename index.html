@@ -18,11 +18,32 @@
         <header class="header">
             <h1>Route Optimizer</h1>
             <div class="header-actions">
+                <button id="help-btn" class="icon-btn" aria-label="Help">ⓘ</button>
                 <button id="saved-routes-btn" class="icon-btn" aria-label="Saved Routes">💾</button>
                 <button id="history-btn" class="icon-btn" aria-label="Route History">🕘</button>
                 <button id="settings-btn" class="icon-btn" aria-label="Settings">⚙️</button>
             </div>
         </header>
+
+        <!-- Help Modal (default features) -->
+        <div id="help-modal" class="modal hidden">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>How to use</h2>
+                    <button id="close-help-btn" class="icon-btn" aria-label="Close">✕</button>
+                </div>
+                <div class="settings-info">
+                    <p>• Enter a start location, stops, and (optionally) an end location, then tap Optimize.</p>
+                    <p>• <strong>Reorder a stop:</strong> press and hold the ≡ handle on the right of a stop, then drag it up or down.</p>
+                    <p>• <strong>Pin / lock a stop:</strong> tap the 🔓 icon on a stop to lock it (📌) to that position. Pinned stops stay put while the rest of the route is optimized around them.</p>
+                    <p>• <strong>Delete a stop:</strong> swipe left on it.</p>
+                    <p class="indent hint">Turn on Advanced UI in Settings for Bus/Res priority and Rush features.</p>
+                </div>
+                <div class="modal-actions">
+                    <button id="close-help-btn-2" class="btn btn-secondary">Got it</button>
+                </div>
+            </div>
+        </div>
 
         <!-- History Modal -->
         <div id="history-modal" class="modal hidden">
