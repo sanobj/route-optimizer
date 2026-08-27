@@ -1,5 +1,5 @@
 // Service Worker for Route Optimizer PWA
-const CACHE_NAME = 'route-optimizer-v132';
+const CACHE_NAME = 'route-optimizer-v133';
 const ASSETS_TO_CACHE = [
     './',
     './index.html',
@@ -30,22 +30,33 @@ self.addEventListener('activate', (event) => {
     self.clients.claim();
 });
 
-// Fetch - network first, fallback to cache
+// Fetch - network first, fall back to cache when offline.
+// This means an online user always gets the latest app files on refresh,
+// while an offline user still gets the last cached version.
 self.addEventListener('fetch', (event) => {
-    // Don't cache Google Maps API requests
-    if (event.request.url.includes('googleapis.com') || 
-        event.request.url.includes('gstatic.com')) {
+    const req = event.request;
+
+    // Only handle GET requests; let everything else pass through.
+    if (req.method !== 'GET') return;
+
+    // Don't intercept Google Maps / gstatic requests — always go to network.
+    if (req.url.includes('googleapis.com') || req.url.includes('gstatic.com')) {
         return;
     }
 
-    event.waitUntil(
-        caches.open(CACHE_NAME).then((cache) => {
-            return fetch(event.request).then((response) => {
-                cache.put(event.request, response.clone());
+    event.respondWith(
+        fetch(req)
+            .then((response) => {
+                // Cache a copy of successful, same-origin (basic) responses only.
+                if (response && response.ok && response.type === 'basic') {
+                    const copy = response.clone();
+                    caches.open(CACHE_NAME).then((cache) => cache.put(req, copy));
+                }
                 return response;
-            }).catch(() => {
-                return cache.match(event.request);
-            });
-        })
+            })
+            .catch(() =>
+                // Offline: serve from cache, falling back to index.html for navigations.
+                caches.match(req).then((cached) => cached || caches.match('./index.html'))
+            )
     );
 });
