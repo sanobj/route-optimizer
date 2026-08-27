@@ -132,16 +132,10 @@
         input.focus();
     }
 
-    // Inline SVG padlock icons so the lock looks identical on every platform
-    // (emoji 🔓/🔒 render differently on Apple vs Windows/Android).
-    // Clean outline style (Feather/Material-like): rounded body, even stroke.
-    // Open: shackle raised and swung out to the left — clearly unlocked.
-    const LOCK_OPEN_SVG = '<svg class="lock-svg" viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="11" width="14" height="9" rx="2.5"/><path d="M8 11V7a4 4 0 0 1 7.5-2"/></svg>';
-    // Closed: shackle down over the body — locked.
-    const LOCK_CLOSED_SVG = '<svg class="lock-svg" viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2.5"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>';
-
+    // Lock state icons (emoji). Note: Apple renders these differently from
+    // Windows/Android, but the dimmed-vs-highlighted styling carries the state.
     function lockIcon(isLocked) {
-        return isLocked ? LOCK_CLOSED_SVG : LOCK_OPEN_SVG;
+        return isLocked ? '🔒' : '🔓';
     }
 
     function togglePin(id) {
@@ -358,7 +352,7 @@
     }
 
     // App version tag in settings (keep in sync with sw.js CACHE_NAME)
-    const APP_VERSION = 'v158';
+    const APP_VERSION = 'v159';
     const appVersionEl = document.getElementById('app-version');
     if (appVersionEl) appVersionEl.textContent = APP_VERSION;
 
