@@ -290,19 +290,39 @@ body {
     filter: brightness(1.5) saturate(1.5);
 }
 
-/* The (i) help button is a text glyph, not an emoji — give it the accent
-   color so it stays visible in both light and dark themes. Force text
-   presentation so platforms don't render it as a dark emoji that ignores color. */
+/* The help button icon is drawn with CSS (a bordered circle + "i") instead of
+   an emoji/glyph, so its color is fully controllable and identical on every
+   platform and in both themes. */
 #help-btn {
-    color: var(--primary);
     filter: none;
-    font-variant-emoji: text;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+#help-btn .info-glyph {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    border: 2px solid var(--primary);
+    color: var(--primary);
+    font-size: 0.85rem;
     font-weight: 700;
+    font-style: italic;
+    font-family: Georgia, 'Times New Roman', serif;
+    line-height: 1;
 }
 
 [data-theme="dark"] #help-btn {
-    color: #6cb6ff;
     filter: none;
+}
+
+[data-theme="dark"] #help-btn .info-glyph {
+    border-color: #6cb6ff;
+    color: #6cb6ff;
 }
 
 .icon-btn:hover {

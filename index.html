@@ -18,7 +18,7 @@
         <header class="header">
             <h1>Route Optimizer</h1>
             <div class="header-actions">
-                <button id="help-btn" class="icon-btn" aria-label="Help">&#9432;&#65038;</button>
+                <button id="help-btn" class="icon-btn" aria-label="Help"><span class="info-glyph">i</span></button>
                 <button id="saved-routes-btn" class="icon-btn" aria-label="Saved Routes">💾</button>
                 <button id="history-btn" class="icon-btn" aria-label="Route History">🕘</button>
                 <button id="settings-btn" class="icon-btn" aria-label="Settings">⚙️</button>
@@ -46,6 +46,14 @@
                     <ul class="help-list">
                         <li><strong>Reorder:</strong> press and hold the <span class="help-key">≡</span> handle on a stop, then drag it up or down.</li>
                         <li><strong>Pin / lock:</strong> tap the <span class="help-key">🔓</span> icon to lock a stop (<span class="help-key">📌</span>) in place. Pinned stops stay put while everything else is optimized around them.</li>
+                        <li><strong>Delete one stop:</strong> tap the <span class="help-key">✕</span> on that stop's row.</li>
+                        <li><strong>Clear everything:</strong> tap the large <span class="help-key">✕</span> next to Optimize to delete the whole list.</li>
+                    </ul>
+
+                    <h3 class="help-heading">Saved routes &amp; history</h3>
+                    <ul class="help-list">
+                        <li><strong>Save a route:</strong> tap <span class="help-key">💾</span> to store the current route so you can reload it anytime.</li>
+                        <li><strong>History:</strong> tap <span class="help-key">🕘</span> to see recently optimized routes. History is saved automatically and expires after 3 days.</li>
                     </ul>
 
                     <p class="help-note">Turn on Advanced UI in Settings for Bus/Res priority and Rush features.</p>

@@ -346,7 +346,7 @@
     }
 
     // App version tag in settings (keep in sync with sw.js CACHE_NAME)
-    const APP_VERSION = 'v141';
+    const APP_VERSION = 'v142';
     const appVersionEl = document.getElementById('app-version');
     if (appVersionEl) appVersionEl.textContent = APP_VERSION;
 
