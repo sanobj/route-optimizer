@@ -506,6 +506,54 @@ body {
     justify-content: flex-end;
 }
 
+/* Feedback */
+.feedback-section {
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+}
+
+.feedback-section h3 {
+    margin: 0 0 4px;
+    font-size: 1rem;
+}
+
+.feedback-type-row {
+    display: flex;
+    gap: 16px;
+    margin: 10px 0;
+    font-size: 0.85rem;
+}
+
+.feedback-type-row label {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+}
+
+.feedback-text {
+    width: 100%;
+    box-sizing: border-box;
+    resize: vertical;
+    padding: 10px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--surface);
+    color: var(--text);
+    font-family: inherit;
+    font-size: 0.9rem;
+    margin-bottom: 10px;
+}
+
+.feedback-status {
+    margin-top: 8px;
+}
+
+.feedback-status.hidden {
+    display: none;
+}
+
 /* Route Summary */
 .route-summary {
     display: flex;

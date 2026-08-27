@@ -335,6 +335,44 @@
         });
     }
 
+    // Feedback (mailto — no backend required)
+    const FEEDBACK_EMAIL = 'sanobj.dev@gmail.com'; // TODO: change to your address
+    const sendFeedbackBtn = document.getElementById('send-feedback-btn');
+    if (sendFeedbackBtn) {
+        sendFeedbackBtn.addEventListener('click', () => {
+            const textEl = document.getElementById('feedback-text');
+            const statusEl = document.getElementById('feedback-status');
+            const typeEl = document.querySelector('input[name="feedback-type"]:checked');
+            const message = (textEl && textEl.value || '').trim();
+            const type = typeEl ? typeEl.value : 'Feedback';
+
+            if (!message) {
+                if (statusEl) {
+                    statusEl.textContent = 'Please enter your feedback first.';
+                    statusEl.classList.remove('hidden');
+                }
+                return;
+            }
+
+            const subject = `Route Optimizer ${type} feedback`;
+            const body =
+                `${message}\n\n` +
+                `---\n` +
+                `Type: ${type}\n` +
+                `App version: v132\n` +
+                `Device: ${navigator.userAgent}\n`;
+            const mailto = `mailto:${FEEDBACK_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+            window.location.href = mailto;
+
+            if (textEl) textEl.value = '';
+            if (statusEl) {
+                statusEl.textContent = 'Opening your email app...';
+                statusEl.classList.remove('hidden');
+                setTimeout(() => statusEl.classList.add('hidden'), 4000);
+            }
+        });
+    }
+
     // Settings
     const advancedInfoBtn = document.getElementById('advanced-info-btn');
     const advancedInfo = document.getElementById('advanced-info');

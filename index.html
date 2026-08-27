@@ -39,6 +39,20 @@
                     <p>• <strong>Delete a stop:</strong> swipe left on it.</p>
                     <p class="indent hint">Turn on Advanced UI in Settings for Bus/Res priority and Rush features.</p>
                 </div>
+
+                <div class="feedback-section">
+                    <h3>Send feedback</h3>
+                    <p class="hint">Report a bug, request a feature, or share a suggestion.</p>
+                    <div class="feedback-type-row">
+                        <label><input type="radio" name="feedback-type" value="Bug" checked> Bug</label>
+                        <label><input type="radio" name="feedback-type" value="Feature"> Feature</label>
+                        <label><input type="radio" name="feedback-type" value="Other"> Other</label>
+                    </div>
+                    <textarea id="feedback-text" class="feedback-text" rows="4" placeholder="Describe the bug, feature, or feedback..."></textarea>
+                    <button id="send-feedback-btn" class="btn btn-primary">Send feedback</button>
+                    <p id="feedback-status" class="hint feedback-status hidden"></p>
+                </div>
+
                 <div class="modal-actions">
                     <button id="close-help-btn-2" class="btn btn-secondary">Got it</button>
                 </div>
