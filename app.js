@@ -345,11 +345,22 @@
         });
     }
 
+    // API key setup info toggle
+    const apiKeyInfoBtn = document.getElementById('api-key-info-btn');
+    const apiKeyInfo = document.getElementById('api-key-info');
+    if (apiKeyInfoBtn && apiKeyInfo) {
+        apiKeyInfoBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            apiKeyInfo.classList.toggle('hidden');
+        });
+    }
+
     function openSettings() {
         apiKeyInput.value = apiKey;
         document.getElementById('dark-mode-toggle').checked = darkMode;
         document.getElementById('advanced-ui-toggle').checked = advancedUI;
         if (advancedInfo) advancedInfo.classList.add('hidden');
+        if (apiKeyInfo) apiKeyInfo.classList.add('hidden');
         settingsModal.classList.remove('hidden');
     }
 

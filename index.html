@@ -92,9 +92,27 @@
         <div id="settings-modal" class="modal hidden">
             <div class="modal-content">
                 <h2>Settings</h2>
-                <label for="api-key-input">Google Maps API Key</label>
+                <label for="api-key-input">Google Maps API Key <button type="button" class="info-btn" id="api-key-info-btn">ⓘ</button></label>
                 <input type="password" id="api-key-input" placeholder="Enter your API key">
-                <p class="hint">Get a free key at <a href="https://console.cloud.google.com/" target="_blank">Google Cloud Console</a></p>
+                <div id="api-key-info" class="settings-info hidden">
+                    <p><strong>Set up your own free API key:</strong></p>
+                    <ul class="help-list">
+                        <li>Go to the <a href="https://console.cloud.google.com/" target="_blank" rel="noopener">Google Cloud Console</a> and sign in.</li>
+                        <li>Create a project (or pick an existing one) from the project menu at the top.</li>
+                        <li>Open <strong>APIs &amp; Services → Library</strong> and enable these four APIs:
+                            <ul class="help-sublist">
+                                <li>Maps JavaScript API</li>
+                                <li>Directions API</li>
+                                <li>Places API</li>
+                                <li>Geocoding API</li>
+                            </ul>
+                        </li>
+                        <li>Go to <strong>APIs &amp; Services → Credentials → Create credentials → API key</strong>.</li>
+                        <li>Copy the key it gives you and paste it into the field above.</li>
+                        <li><strong>Recommended:</strong> click the key to add restrictions — limit it to the four APIs above, and set an HTTP referrer restriction to your app's URL to keep it private.</li>
+                    </ul>
+                    <p class="help-note">Google's Maps Platform includes a monthly free usage credit, so normal personal use is typically free. You'll need to add a billing account to activate the key.</p>
+                </div>
                 <div class="settings-toggle">
                     <label for="dark-mode-toggle">Dark Mode</label>
                     <input type="checkbox" id="dark-mode-toggle">

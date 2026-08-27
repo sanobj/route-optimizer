@@ -563,6 +563,26 @@ body {
     vertical-align: baseline;
 }
 
+.help-sublist {
+    list-style: none;
+    margin: 6px 0 0;
+    padding: 0;
+}
+
+.help-sublist li {
+    position: relative;
+    padding-left: 16px;
+    margin-bottom: 4px;
+}
+
+.help-sublist li::before {
+    content: "–";
+    position: absolute;
+    left: 2px;
+    top: 0;
+    color: var(--text-secondary);
+}
+
 .help-note {
     margin: 16px 0 0;
     padding: 10px 12px;
