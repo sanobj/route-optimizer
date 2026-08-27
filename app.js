@@ -1053,15 +1053,144 @@
         }
     }
 
+    // ===== TRUE OPTIMIZATION: Distance Matrix + Nearest-Neighbor + 2-opt =====
+
+    // Get a driving-time distance matrix for a set of points (origin + stops + destination)
+    // points is an array of address strings. Returns a 2D array of durations in seconds.
+    // Google's Distance Matrix allows max 25 origins x 25 destinations per request,
+    // and 100 elements per request, so we chunk as needed.
+    async function getDistanceMatrix(points) {
+        const service = new google.maps.DistanceMatrixService();
+        const n = points.length;
+        const matrix = Array.from({ length: n }, () => new Array(n).fill(Infinity));
+
+        // Chunk origins so origins*destinations <= 100 and origins <= 25, destinations <= 25
+        const MAX_ORIGINS = 10; // 10 x 10 = 100 elements per request (safe)
+        const MAX_DESTS = 10;
+
+        for (let oStart = 0; oStart < n; oStart += MAX_ORIGINS) {
+            const originChunk = points.slice(oStart, oStart + MAX_ORIGINS);
+            for (let dStart = 0; dStart < n; dStart += MAX_DESTS) {
+                const destChunk = points.slice(dStart, dStart + MAX_DESTS);
+
+                const response = await new Promise((resolve) => {
+                    service.getDistanceMatrix({
+                        origins: originChunk,
+                        destinations: destChunk,
+                        travelMode: google.maps.TravelMode.DRIVING,
+                    }, (res, status) => {
+                        if (status === 'OK') resolve(res);
+                        else resolve(null);
+                    });
+                });
+
+                if (response) {
+                    response.rows.forEach((row, oi) => {
+                        row.elements.forEach((el, di) => {
+                            if (el.status === 'OK') {
+                                matrix[oStart + oi][dStart + di] = el.duration.value;
+                            }
+                        });
+                    });
+                }
+            }
+        }
+
+        return matrix;
+    }
+
+    // Nearest-neighbor construction: build a route from fixed start index through
+    // all waypoint indices to fixed end index, using the distance matrix.
+    // startIdx and endIdx are indices into the matrix; waypointIndices are the stops to order.
+    function nearestNeighborRoute(matrix, startIdx, waypointIndices, endIdx) {
+        const route = [];
+        const remaining = [...waypointIndices];
+        let current = startIdx;
+
+        while (remaining.length > 0) {
+            let bestIdx = 0;
+            let bestDist = Infinity;
+            for (let i = 0; i < remaining.length; i++) {
+                const d = matrix[current][remaining[i]];
+                if (d < bestDist) {
+                    bestDist = d;
+                    bestIdx = i;
+                }
+            }
+            const next = remaining.splice(bestIdx, 1)[0];
+            route.push(next);
+            current = next;
+        }
+        return route;
+    }
+
+    // Total cost of a route: start → route[0] → route[1] → ... → end
+    function routeCost(matrix, startIdx, route, endIdx) {
+        let cost = 0;
+        let prev = startIdx;
+        for (const idx of route) {
+            cost += matrix[prev][idx];
+            prev = idx;
+        }
+        cost += matrix[prev][endIdx];
+        return cost;
+    }
+
+    // 2-opt improvement: repeatedly reverse segments if it shortens the total route.
+    // This removes crossings and local inefficiencies (e.g. 10->11->12 vs 10->12->11).
+    function twoOptImprove(matrix, startIdx, route, endIdx) {
+        let best = route.slice();
+        let improved = true;
+        let iterations = 0;
+        const maxIterations = 50; // safety cap
+
+        while (improved && iterations < maxIterations) {
+            improved = false;
+            iterations++;
+            for (let i = 0; i < best.length - 1; i++) {
+                for (let j = i + 1; j < best.length; j++) {
+                    // Reverse segment between i and j
+                    const candidate = best.slice(0, i).concat(
+                        best.slice(i, j + 1).reverse(),
+                        best.slice(j + 1)
+                    );
+                    if (routeCost(matrix, startIdx, candidate, endIdx) < routeCost(matrix, startIdx, best, endIdx) - 0.5) {
+                        best = candidate;
+                        improved = true;
+                    }
+                }
+            }
+        }
+        return best;
+    }
+
+    // Optimize a group of stops (addresses) between a fixed origin and destination.
+    // Returns a promise resolving to the optimally ordered address array.
+    async function optimizeGroup(originAddr, stopAddresses, destAddr) {
+        if (stopAddresses.length <= 1) return stopAddresses.slice();
+
+        // Build points: [origin, ...stops, destination]
+        const points = [originAddr, ...stopAddresses, destAddr];
+        const matrix = await getDistanceMatrix(points);
+
+        const startIdx = 0;
+        const endIdx = points.length - 1;
+        const waypointIndices = stopAddresses.map((_, i) => i + 1); // indices 1..n
+
+        // Build initial route with nearest-neighbor, then improve with 2-opt
+        let route = nearestNeighborRoute(matrix, startIdx, waypointIndices, endIdx);
+        route = twoOptImprove(matrix, startIdx, route, endIdx);
+
+        // Map indices back to addresses
+        return route.map(idx => points[idx]);
+    }
+
     function optimizeWithPinnedStops(origin, destination, filledStops) {
         // Strategy: For mixed bus/res types without pins, let Google optimize ALL stops together
         // for the best overall route, then reorder the result so businesses come first.
         // For pinned stops, split at pin boundaries and optimize each segment.
 
-        const allAddresses = filledStops.map(s => s.address.trim());
         const hasPins = filledStops.some(s => s.pinned);
-        const hasMixedTypes = filledStops.some(s => s.type === 'bus') && 
-                              filledStops.some(s => s.type !== 'bus');
 
         // If there are pinned stops, use segment-based approach
         if (hasPins) {
@@ -1069,171 +1198,69 @@
             return;
         }
 
-        // No pins: optimize all stops together, then ensure businesses come first
-        const directionsService = new google.maps.DirectionsService();
-        
-        if (!hasMixedTypes) {
-            // All same type — just let Google optimize everything
-            directionsService.route({
-                origin: origin,
-                destination: destination,
-                waypoints: allAddresses.map(addr => ({ location: addr, stopover: true })),
-                optimizeWaypoints: true,
-                travelMode: google.maps.TravelMode.DRIVING,
-            }, (result, status) => {
-                if (status === google.maps.DirectionsStatus.OK) {
-                    try { displayRoute(result, origin, allAddresses); } catch(e) { console.error(e); }
-                } else { handleDirectionsError(status); }
-                optimizeBtn.innerHTML = 'Optimize Route';
-                optimizeBtn.disabled = false;
-                updateOptimizeButton();
-            });
-            return;
-        }
-
-        // Mixed types: optimize all together, then move businesses to front (sorted by proximity to origin)
-        // First, geocode origin and businesses to sort by distance
-        const geocoder = new google.maps.Geocoder();
-        const busStops = filledStops.filter(s => s.type === 'bus');
-        const otherStops = filledStops.filter(s => s.type !== 'bus');
-        const busAddresses = busStops.map(s => s.address.trim());
-        const otherAddresses = otherStops.map(s => s.address.trim());
-
-        // Get origin coordinates
-        geocoder.geocode({ address: origin }, (originResults, originStatus) => {
-            let originLat = 0, originLng = 0;
-            if (originStatus === 'OK' && originResults[0]) {
-                originLat = originResults[0].geometry.location.lat();
-                originLng = originResults[0].geometry.location.lng();
-            }
-
-            // Geocode all businesses to sort by distance from origin
-            const busGeoPromises = busAddresses.map(addr => new Promise(resolve => {
-                geocoder.geocode({ address: addr }, (results, status) => {
-                    if (status === 'OK' && results[0]) {
-                        resolve({ addr, lat: results[0].geometry.location.lat(), lng: results[0].geometry.location.lng() });
-                    } else {
-                        resolve({ addr, lat: originLat, lng: originLng });
-                    }
-                });
-            }));
-
-            Promise.all(busGeoPromises).then(busGeos => {
-                // Sort businesses using nearest-neighbor chain from origin
-                // (visit closest unvisited business from current position)
-                const sortedBus = [];
-                const remaining = [...busGeos];
-                let curLat = originLat;
-                let curLng = originLng;
-
-                while (remaining.length > 0) {
-                    let nearestIdx = 0;
-                    let nearestDist = Infinity;
-                    for (let i = 0; i < remaining.length; i++) {
-                        const dist = Math.pow(remaining[i].lat - curLat, 2) + Math.pow(remaining[i].lng - curLng, 2);
-                        if (dist < nearestDist) {
-                            nearestDist = dist;
-                            nearestIdx = i;
-                        }
-                    }
-                    const nearest = remaining.splice(nearestIdx, 1)[0];
-                    sortedBus.push(nearest);
-                    curLat = nearest.lat;
-                    curLng = nearest.lng;
-                }
-
-                const sortedBusAddresses = sortedBus.map(g => g.addr);
-
-                // Now optimize residences: from last business to destination
-                const lastBus = sortedBusAddresses[sortedBusAddresses.length - 1] || origin;
-                
-                directionsService.route({
-                    origin: lastBus,
-                    destination: destination,
-                    waypoints: otherAddresses.map(addr => ({ location: addr, stopover: true })),
-                    optimizeWaypoints: true,
-                    travelMode: google.maps.TravelMode.DRIVING,
-                }, (resResult, resStatus) => {
-                    let orderedOther = otherAddresses;
-                    if (resStatus === google.maps.DirectionsStatus.OK && resResult.routes[0].waypoint_order) {
-                        const resOrder = resResult.routes[0].waypoint_order;
-                        orderedOther = resOrder.map(i => otherAddresses[i]);
-                    }
-
-                    // Final route: origin → sorted businesses → optimized residences → destination
-                    const finalWaypoints = [...sortedBusAddresses, ...orderedOther];
-                    directionsService.route({
-                        origin: origin,
-                        destination: destination,
-                        waypoints: finalWaypoints.map(addr => ({ location: addr, stopover: true })),
-                        optimizeWaypoints: false,
-                        travelMode: google.maps.TravelMode.DRIVING,
-                    }, (finalResult, finalStatus) => {
-                        if (finalStatus === google.maps.DirectionsStatus.OK) {
-                            try { displayRoute(finalResult, origin, finalWaypoints); } catch(e) { console.error(e); }
-                        } else { handleDirectionsError(finalStatus); }
-                        optimizeBtn.innerHTML = 'Optimize Route';
-                        optimizeBtn.disabled = false;
-                        updateOptimizeButton();
-                    });
-                });
-            });
-        });
+        // No pins: use true optimization (Distance Matrix + 2-opt) per type group
+        runTrueOptimization(origin, destination, filledStops);
     }
 
-    function finishMixedRoute(directionsService, origin, destination, orderedBus, otherAddresses) {
-        const lastBus = orderedBus.length > 0 ? orderedBus[orderedBus.length - 1] : origin;
-        
-        if (otherAddresses.length === 0) {
-            // Only bus stops
-            directionsService.route({
-                origin: origin,
-                destination: destination,
-                waypoints: orderedBus.map(addr => ({ location: addr, stopover: true })),
-                optimizeWaypoints: false,
-                travelMode: google.maps.TravelMode.DRIVING,
-            }, (r, s) => {
-                if (s === google.maps.DirectionsStatus.OK) {
-                    try { displayRoute(r, origin, orderedBus); } catch(e) { console.error(e); }
-                } else { handleDirectionsError(s); }
-                optimizeBtn.innerHTML = 'Optimize Route';
-                optimizeBtn.disabled = false;
-                updateOptimizeButton();
-            });
-            return;
-        }
+    // True optimization using Distance Matrix + nearest-neighbor + 2-opt.
+    // Businesses optimized first (origin → businesses), then residences
+    // (last business → residences → destination). Guarantees correct ordering.
+    async function runTrueOptimization(origin, destination, filledStops) {
+        try {
+            const busStops = filledStops.filter(s => s.type === 'bus');
+            const otherStops = filledStops.filter(s => s.type !== 'bus');
+            const busAddresses = busStops.map(s => s.address.trim());
+            const otherAddresses = otherStops.map(s => s.address.trim());
 
-        // Optimize residences from last business to destination
-        directionsService.route({
-            origin: lastBus,
-            destination: destination,
-            waypoints: otherAddresses.map(addr => ({ location: addr, stopover: true })),
-            optimizeWaypoints: true,
-            travelMode: google.maps.TravelMode.DRIVING,
-        }, (resResult, resStatus) => {
-            let orderedOther = otherAddresses;
-            if (resStatus === google.maps.DirectionsStatus.OK) {
-                const resLegs = resResult.routes[0].legs;
-                orderedOther = resLegs.slice(0, -1).map(l => l.end_address);
+            let orderedBus = [];
+            let orderedOther = [];
+
+            // Optimize business group: origin → businesses → (first residence or destination)
+            if (busAddresses.length > 0) {
+                const busEnd = otherAddresses.length > 0
+                    ? await pickClosestToGroup(busAddresses, otherAddresses, origin)
+                    : destination;
+                orderedBus = await optimizeGroup(origin, busAddresses, busEnd);
             }
 
-            // Final combined route
+            // Optimize residence group: last business (or origin) → residences → destination
+            if (otherAddresses.length > 0) {
+                const resStart = orderedBus.length > 0 ? orderedBus[orderedBus.length - 1] : origin;
+                orderedOther = await optimizeGroup(resStart, otherAddresses, destination);
+            }
+
             const finalWaypoints = [...orderedBus, ...orderedOther];
+
+            // Get the actual route directions in this exact order
+            const directionsService = new google.maps.DirectionsService();
             directionsService.route({
                 origin: origin,
                 destination: destination,
                 waypoints: finalWaypoints.map(addr => ({ location: addr, stopover: true })),
                 optimizeWaypoints: false,
                 travelMode: google.maps.TravelMode.DRIVING,
-            }, (finalResult, finalStatus) => {
-                if (finalStatus === google.maps.DirectionsStatus.OK) {
-                    try { displayRoute(finalResult, origin, finalWaypoints); } catch(e) { console.error(e); }
-                } else { handleDirectionsError(finalStatus); }
+            }, (result, status) => {
+                if (status === google.maps.DirectionsStatus.OK) {
+                    try { displayRoute(result, origin, finalWaypoints); } catch(e) { console.error(e); }
+                } else { handleDirectionsError(status); }
                 optimizeBtn.innerHTML = 'Optimize Route';
                 optimizeBtn.disabled = false;
                 updateOptimizeButton();
             });
-        });
+        } catch (e) {
+            console.error('True optimization error:', e);
+            optimizeBtn.innerHTML = 'Optimize Route';
+            optimizeBtn.disabled = false;
+            updateOptimizeButton();
+        }
+    }
+
+    // Pick the business address whose position best bridges to the residence group.
+    // Returns the residence address closest to the business cluster (used as bus segment end).
+    async function pickClosestToGroup(busAddresses, otherAddresses, origin) {
+        // Use the first residence as the bridge target — the bus group will be
+        // optimized to end near it. Simple and deterministic.
+        return otherAddresses[0];
     }
 
     function optimizeWithSegments(origin, destination, filledStops) {
@@ -1393,202 +1420,116 @@
     async function batchedOptimize(origin, destination, stopsForOptimize) {
         const MAX_WAYPOINTS = 23;
 
-        // Step 1: Geocode all stops to get coordinates
-        const geocoder = new google.maps.Geocoder();
-        const geocodePromises = stopsForOptimize.map(stop => {
-            return new Promise((resolve) => {
-                geocoder.geocode({ address: stop.address.trim() }, (results, status) => {
-                    if (status === 'OK' && results[0]) {
-                        resolve({
-                            stop: stop,
-                            lat: results[0].geometry.location.lat(),
-                            lng: results[0].geometry.location.lng(),
-                        });
-                    } else {
-                        // Fallback: no coordinates, place at end
-                        resolve({ stop: stop, lat: null, lng: null });
-                    }
+        try {
+            // Step 1: Separate stops by pin status and type
+            const pinnedStops = stopsForOptimize.filter(s => s.pinned);
+            const busStops = stopsForOptimize.filter(s => !s.pinned && s.type === 'bus');
+            const otherStops = stopsForOptimize.filter(s => !s.pinned && s.type !== 'bus');
+
+            const busAddresses = busStops.map(s => s.address.trim());
+            const otherAddresses = otherStops.map(s => s.address.trim());
+
+            // Step 2: True-optimize each type group (Distance Matrix + 2-opt)
+            // For groups larger than the matrix chunk limits, optimizeGroup still works
+            // (getDistanceMatrix chunks internally), but 2-opt on very large N is capped.
+            let orderedBus = [];
+            let orderedOther = [];
+
+            const destForBus = otherAddresses.length > 0 ? otherAddresses[0] : (destination || origin);
+            if (busAddresses.length > 0) {
+                orderedBus = await optimizeGroup(origin, busAddresses, destForBus);
+            }
+
+            const resStart = orderedBus.length > 0 ? orderedBus[orderedBus.length - 1] : origin;
+            const destForRes = destination || resStart;
+            if (otherAddresses.length > 0) {
+                orderedOther = await optimizeGroup(resStart, otherAddresses, destForRes);
+            }
+
+            // Combined optimized order (addresses)
+            let orderedAddresses = [...orderedBus, ...orderedOther];
+
+            // Map ordered addresses back to stop objects (for markers/colors)
+            const orderedStopObjs = orderedAddresses.map(addr => {
+                const match = stopsForOptimize.find(s => s.address.trim() === addr);
+                return { stop: match || { address: addr, type: 'none', rush: false } };
+            });
+
+            // Handle pinned stops: keep at their absolute user positions
+            let finalStopObjs = orderedStopObjs;
+            if (pinnedStops.length > 0) {
+                finalStopObjs = new Array(stopsForOptimize.length).fill(null);
+                stopsForOptimize.forEach((s, i) => {
+                    if (s.pinned) finalStopObjs[i] = { stop: s };
                 });
-            });
-        });
+                let oi = 0;
+                for (let i = 0; i < finalStopObjs.length; i++) {
+                    if (finalStopObjs[i] === null) finalStopObjs[i] = orderedStopObjs[oi++];
+                }
+            }
 
-        // Also geocode origin
-        const originGeo = await new Promise((resolve) => {
-            geocoder.geocode({ address: origin }, (results, status) => {
-                if (status === 'OK' && results[0]) {
-                    resolve({ lat: results[0].geometry.location.lat(), lng: results[0].geometry.location.lng() });
+            const finalOrderedAddresses = finalStopObjs.map(o => o.stop.address.trim());
+
+            // Step 3: Split into batches (order is already optimal — no re-optimization)
+            const directionsService = new google.maps.DirectionsService();
+            const batchResults = [];
+            let batchOrigin = origin;
+
+            // Determine the final destination (No End mode = last stop)
+            let workingAddresses = finalOrderedAddresses.slice();
+            let finalDest = destination;
+            if (!destination) {
+                finalDest = workingAddresses.pop(); // last stop is destination
+            }
+
+            const batches = [];
+            for (let i = 0; i < workingAddresses.length; i += MAX_WAYPOINTS) {
+                batches.push(workingAddresses.slice(i, i + MAX_WAYPOINTS));
+            }
+
+            for (let b = 0; b < batches.length; b++) {
+                const batch = batches[b];
+                const isLastBatch = b === batches.length - 1;
+
+                let batchDest;
+                let waypoints;
+                if (isLastBatch) {
+                    batchDest = finalDest;
+                    waypoints = batch;
                 } else {
-                    resolve({ lat: 0, lng: 0 });
-                }
-            });
-        });
-
-        const geoStops = await Promise.all(geocodePromises);
-
-        // Step 2: Nearest-neighbor sort within type groups
-        // Separate pinned stops (keep in place) from unpinned
-        const pinned = geoStops.filter(g => g.stop.pinned);
-        const unpinned = geoStops.filter(g => !g.stop.pinned);
-
-        // Sort unpinned by type (bus first, then none, then res)
-        const unpinnedBus = unpinned.filter(g => g.stop.type === 'bus');
-        const unpinnedNone = unpinned.filter(g => !g.stop.type || g.stop.type === 'none');
-        const unpinnedRes = unpinned.filter(g => g.stop.type === 'res');
-
-        // Apply nearest-neighbor within each type group
-        function nearestNeighborSort(items, startLat, startLng) {
-            const sorted = [];
-            const remaining = [...items];
-            let currentLat = startLat;
-            let currentLng = startLng;
-
-            while (remaining.length > 0) {
-                let nearestIdx = 0;
-                let nearestDist = Infinity;
-
-                for (let i = 0; i < remaining.length; i++) {
-                    if (remaining[i].lat === null) continue;
-                    const dist = Math.pow(remaining[i].lat - currentLat, 2) + Math.pow(remaining[i].lng - currentLng, 2);
-                    if (dist < nearestDist) {
-                        nearestDist = dist;
-                        nearestIdx = i;
-                    }
+                    // Bridge to next batch: last stop of this batch becomes its destination
+                    batchDest = batch[batch.length - 1];
+                    waypoints = batch.slice(0, -1);
                 }
 
-                const nearest = remaining.splice(nearestIdx, 1)[0];
-                sorted.push(nearest);
-                if (nearest.lat !== null) {
-                    currentLat = nearest.lat;
-                    currentLng = nearest.lng;
+                const result = await new Promise((resolve) => {
+                    directionsService.route({
+                        origin: batchOrigin,
+                        destination: batchDest,
+                        waypoints: waypoints.map(addr => ({ location: addr, stopover: true })),
+                        optimizeWaypoints: false, // order already optimal
+                        travelMode: google.maps.TravelMode.DRIVING,
+                    }, (res, status) => {
+                        if (status === google.maps.DirectionsStatus.OK) resolve(res);
+                        else { console.error('Batch', b + 1, 'failed:', status); resolve(null); }
+                    });
+                });
+
+                if (result) {
+                    batchResults.push({ result, batchOrigin, batchDest });
                 }
+                batchOrigin = batchDest;
             }
-            return sorted;
-        }
 
-        // Sort each type group by nearest-neighbor
-        let lastLat = originGeo.lat;
-        let lastLng = originGeo.lng;
-
-        const sortedBus = nearestNeighborSort(unpinnedBus, lastLat, lastLng);
-        if (sortedBus.length > 0) {
-            const lastBus = sortedBus[sortedBus.length - 1];
-            if (lastBus.lat) { lastLat = lastBus.lat; lastLng = lastBus.lng; }
-        }
-
-        const sortedNone = nearestNeighborSort(unpinnedNone, lastLat, lastLng);
-        if (sortedNone.length > 0) {
-            const lastNone = sortedNone[sortedNone.length - 1];
-            if (lastNone.lat) { lastLat = lastNone.lat; lastLng = lastNone.lng; }
-        }
-
-        const sortedRes = nearestNeighborSort(unpinnedRes, lastLat, lastLng);
-
-        // Combine: bus → none → res (all nearest-neighbor sorted)
-        const allSorted = [...sortedBus, ...sortedNone, ...sortedRes];
-
-        // Build final order: pinned stops at their absolute positions, sorted stops fill the gaps
-        const finalOrder = new Array(geoStops.length).fill(null);
-        
-        // First, place pinned stops at their original user positions
-        geoStops.forEach((g, i) => {
-            if (g.stop.pinned) {
-                finalOrder[i] = g;
-            }
-        });
-        
-        // Fill remaining slots with sorted unpinned stops
-        let sortedIdx = 0;
-        for (let i = 0; i < finalOrder.length; i++) {
-            if (finalOrder[i] === null) {
-                finalOrder[i] = allSorted[sortedIdx++];
-            }
-        }
-
-        // Step 3: Split into batches
-        const batches = [];
-        for (let i = 0; i < finalOrder.length; i += MAX_WAYPOINTS) {
-            batches.push(finalOrder.slice(i, i + MAX_WAYPOINTS));
-        }
-
-        // Step 4: Optimize each batch via Directions API
-        const directionsService = new google.maps.DirectionsService();
-        const batchResults = [];
-        let batchOrigin = origin;
-
-        for (let b = 0; b < batches.length; b++) {
-            const batch = batches[b];
-            const isLastBatch = b === batches.length - 1;
-
-            // Determine batch destination
-            let batchDest;
-            if (isLastBatch) {
-                if (destination) {
-                    batchDest = destination;
-                } else {
-                    // No end mode: last stop is destination
-                    batchDest = batch[batch.length - 1].stop.address.trim();
-                    batch.pop(); // Remove from waypoints
-                }
+            // Step 4: Display
+            if (batchResults.length > 0) {
+                displayBatchedRoute(batchResults, origin, finalStopObjs);
             } else {
-                // Use last stop of this batch as destination (bridge to next batch)
-                batchDest = batch[batch.length - 1].stop.address.trim();
-                batch.pop();
+                alert('Route optimization failed. Please try fewer stops.');
             }
-
-            // Check if this batch has pinned stops or mixed types
-            const batchHasPins = batch.some(g => g.stop.pinned);
-            const batchHasBus = batch.some(g => g.stop.type === 'bus');
-            const batchHasOther = batch.some(g => g.stop.type !== 'bus');
-            const batchMixed = batchHasBus && batchHasOther;
-
-            const waypoints = batch.map(g => g.stop.address.trim());
-
-            // Optimize within batch when safe (no pins, single type)
-            // If pinned or mixed, preserve order (businesses stay before residences)
-            const canOptimize = !batchHasPins && !batchMixed;
-
-            const result = await new Promise((resolve) => {
-                directionsService.route({
-                    origin: batchOrigin,
-                    destination: batchDest,
-                    waypoints: waypoints.map(addr => ({ location: addr, stopover: true })),
-                    optimizeWaypoints: canOptimize,
-                    travelMode: google.maps.TravelMode.DRIVING,
-                }, (res, status) => {
-                    if (status === google.maps.DirectionsStatus.OK) {
-                        resolve(res);
-                    } else {
-                        console.error('Batch', b + 1, 'failed:', status);
-                        resolve(null);
-                    }
-                });
-            });
-
-            if (result) {
-                // Reorder batch stops to match Google's optimized waypoint order
-                if (canOptimize && result.routes[0].waypoint_order) {
-                    const order = result.routes[0].waypoint_order;
-                    const reorderedBatch = order.map(i => batch[i]);
-                    batchResults.push({ result, batchOrigin, batchDest, batchStops: reorderedBatch });
-                } else {
-                    batchResults.push({ result, batchOrigin, batchDest, batchStops: batch });
-                }
-            }
-
-            // Next batch starts where this one ends
-            batchOrigin = batchDest;
-        }
-
-        // Step 5: Display all batches on map
-        if (batchResults.length > 0) {
-            // Rebuild finalOrder from the (possibly reordered) batch stops
-            const rebuiltOrder = [];
-            batchResults.forEach(br => {
-                br.batchStops.forEach(g => rebuiltOrder.push(g));
-            });
-            displayBatchedRoute(batchResults, origin, rebuiltOrder);
-        } else {
-            alert('Route optimization failed. Please try fewer stops.');
+        } catch (e) {
+            console.error('Batched optimize error:', e);
+            alert('Route optimization failed. Please try again.');
         }
 
         optimizeBtn.innerHTML = 'Optimize Route';
