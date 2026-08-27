@@ -613,6 +613,57 @@ body {
     padding-left: 8px;
 }
 
+.breakdown-selectable {
+    cursor: pointer;
+    border-radius: 6px;
+    padding: 2px 4px;
+    transition: background 0.15s ease;
+}
+
+.breakdown-selectable:hover {
+    background: rgba(66, 133, 244, 0.08);
+}
+
+.breakdown-selected {
+    background: rgba(66, 133, 244, 0.15);
+}
+
+.breakdown-split {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin: 4px 0 6px 4px;
+    padding: 8px 10px;
+    background: var(--surface);
+    border: 1px dashed var(--border);
+    border-radius: 8px;
+}
+
+.split-row {
+    font-size: 0.8rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.split-tag {
+    display: inline-block;
+    font-size: 0.68rem;
+    font-weight: 700;
+    color: white;
+    border-radius: 4px;
+    padding: 1px 6px;
+    margin-right: 6px;
+    vertical-align: middle;
+}
+
+.split-tag.split-above {
+    background: var(--primary);
+}
+
+.split-tag.split-below {
+    background: #6b7280;
+}
+
 /* Map Filter */
 .map-filter-row {
     display: flex;

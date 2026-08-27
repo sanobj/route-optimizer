@@ -1701,11 +1701,13 @@
         const timeStr = hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
 
         // Breakdown
+        const batchedLegValues = [];
         let breakdownHtml = '<div class="route-breakdown hidden">';
         breakdownHtml += `<div class="breakdown-stop"><span class="breakdown-label breakdown-start">Start</span> ${firstLeg.start_address}</div>`;
         let legNum = 1;
         allLegs.forEach((item, i) => {
             const isLast = i === allLegs.length - 1;
+            batchedLegValues.push({ dist: item.leg.distance.value, dur: item.leg.duration.value });
             breakdownHtml += `<div class="breakdown-arrow">↓ ${item.leg.distance.text} · ${item.leg.duration.text}</div>`;
             const label = isLast ? 'End' : `${legNum}`;
             let cls = isLast ? 'breakdown-end' : '';
@@ -1735,10 +1737,6 @@
                     <div class="stat-value">${allLegs.length}</div>
                     <div class="stat-label">Stops</div>
                 </div>
-                <div class="stat">
-                    <div class="stat-value">${batchResults.length}</div>
-                    <div class="stat-label">Routes</div>
-                </div>
             </div>
             <div class="summary-expand-hint">Tap for breakdown ▾</div>
             ${breakdownHtml}
@@ -1752,6 +1750,7 @@
                 hint.textContent = breakdown.classList.contains('hidden') ? 'Tap for breakdown ▾' : 'Tap to collapse ▴';
             }
         };
+        initBreakdownSplit(routeSummary.querySelector('.route-breakdown'), batchedLegValues);
 
         // Multiple navigation links
         const navHtml = batchResults.map((batch, i) => {
@@ -1846,6 +1845,60 @@
             },
         });
         window._routeMarkers.push({ marker, type: 'start' });
+    }
+
+    // Format seconds into "1h 23m" / "23m" / "45s"
+    function formatDurationSecs(secs) {
+        secs = Math.round(secs);
+        const h = Math.floor(secs / 3600);
+        const m = Math.round((secs % 3600) / 60);
+        if (h > 0) return `${h}h ${m}m`;
+        if (m > 0) return `${m}m`;
+        return `${secs}s`;
+    }
+
+    // Format meters into "1.8 mi"
+    function formatDistanceMeters(meters) {
+        return `${(meters / 1609.34).toFixed(1)} mi`;
+    }
+
+    // Wire up click-to-split behavior on a rendered breakdown.
+    // legValues is an array of { dist, dur } (meters, seconds) for each leg, in order.
+    // Clicking a stop shows cumulative distance/time above (Start→stop) and below (stop→End).
+    function initBreakdownSplit(breakdownEl, legValues) {
+        if (!breakdownEl) return;
+        const stopEls = Array.from(breakdownEl.querySelectorAll('.breakdown-stop'));
+        // stopEls[0] = Start, stopEls[k] = end of leg k-1 (arrives after legValues[k-1])
+        // "above" a stop at index k = sum of legValues[0..k-1]; "below" = sum of legValues[k..end]
+        const totalDist = legValues.reduce((s, l) => s + l.dist, 0);
+        const totalDur = legValues.reduce((s, l) => s + l.dur, 0);
+
+        stopEls.forEach((el, k) => {
+            el.classList.add('breakdown-selectable');
+            el.addEventListener('click', (e) => {
+                e.stopPropagation(); // don't collapse the whole breakdown
+
+                // Remove any existing split rows and clear selection
+                breakdownEl.querySelectorAll('.breakdown-split').forEach(n => n.remove());
+                const already = el.classList.contains('breakdown-selected');
+                stopEls.forEach(s => s.classList.remove('breakdown-selected'));
+                if (already) return; // toggle off
+
+                el.classList.add('breakdown-selected');
+
+                let aboveDist = 0, aboveDur = 0;
+                for (let i = 0; i < k; i++) { aboveDist += legValues[i].dist; aboveDur += legValues[i].dur; }
+                const belowDist = totalDist - aboveDist;
+                const belowDur = totalDur - aboveDur;
+
+                const split = document.createElement('div');
+                split.className = 'breakdown-split';
+                split.innerHTML =
+                    `<div class="split-row"><span class="split-tag split-above">Above</span> ${formatDistanceMeters(aboveDist)} · ${formatDurationSecs(aboveDur)}</div>` +
+                    `<div class="split-row"><span class="split-tag split-below">Below</span> ${formatDistanceMeters(belowDist)} · ${formatDurationSecs(belowDur)}</div>`;
+                el.insertAdjacentElement('afterend', split);
+            });
+        });
     }
 
     function addNumberedMarker(position, label, color, address, stopType, isRush) {
@@ -2195,11 +2248,13 @@
         const timeStr = hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
 
         // Build leg breakdown HTML
+        const routeLegValues = [];
         let breakdownHtml = '<div class="route-breakdown hidden">';
         // Show first address (start)
         breakdownHtml += `<div class="breakdown-stop"><span class="breakdown-label breakdown-start">Start</span> ${legs[0].start_address}</div>`;
         // Show each leg's distance/time then the next address
         legs.forEach((leg, i) => {
+            routeLegValues.push({ dist: leg.distance.value, dur: leg.duration.value });
             breakdownHtml += `<div class="breakdown-arrow">↓ ${leg.distance.text} · ${leg.duration.text}</div>`;
             const isLast = i === legs.length - 1;
             const label = isLast ? 'End' : `${i + 1}`;
@@ -2247,6 +2302,7 @@
                 hint.textContent = breakdown.classList.contains('hidden') ? 'Tap for breakdown ▾' : 'Tap to collapse ▴';
             }
         };
+        initBreakdownSplit(routeSummary.querySelector('.route-breakdown'), routeLegValues);
 
         // Save optimized route for Google Maps navigation link
         optimizedRoute = {
