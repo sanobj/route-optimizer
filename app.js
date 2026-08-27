@@ -2770,10 +2770,43 @@
         }
     });
 
-    // Register Service Worker
+    // Register Service Worker with automatic update handling.
     if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('sw.js').catch(() => {
-            // Service worker registration failed, app still works
+        // updateViaCache: 'none' forces the browser to fetch sw.js from the network
+        // every time, so a new version is detected immediately instead of being
+        // served from the HTTP cache.
+        navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' })
+            .then((registration) => {
+                // Check for an updated service worker on load.
+                registration.update();
+
+                // When a new worker is found and finishes installing, activate it.
+                registration.addEventListener('updatefound', () => {
+                    const newWorker = registration.installing;
+                    if (!newWorker) return;
+                    newWorker.addEventListener('statechange', () => {
+                        if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                            // A new version is ready and an old one is controlling the page.
+                            newWorker.postMessage({ type: 'SKIP_WAITING' });
+                        }
+                    });
+                });
+
+                // Also check for updates whenever the app regains focus.
+                document.addEventListener('visibilitychange', () => {
+                    if (document.visibilityState === 'visible') registration.update();
+                });
+            })
+            .catch(() => {
+                // Service worker registration failed, app still works
+            });
+
+        // When the active service worker changes, reload once to load the new files.
+        let _reloadedForSW = false;
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+            if (_reloadedForSW) return;
+            _reloadedForSW = true;
+            window.location.reload();
         });
     }
 

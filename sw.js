@@ -1,5 +1,5 @@
 // Service Worker for Route Optimizer PWA
-const CACHE_NAME = 'route-optimizer-v136';
+const CACHE_NAME = 'route-optimizer-v137';
 const ASSETS_TO_CACHE = [
     './',
     './index.html',
@@ -7,6 +7,13 @@ const ASSETS_TO_CACHE = [
     './app.js',
     './manifest.json'
 ];
+
+// Allow the page to tell a waiting worker to activate immediately.
+self.addEventListener('message', (event) => {
+    if (event.data && event.data.type === 'SKIP_WAITING') {
+        self.skipWaiting();
+    }
+});
 
 // Install - cache core assets
 self.addEventListener('install', (event) => {
