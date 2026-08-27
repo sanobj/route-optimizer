@@ -662,6 +662,13 @@ body {
     font-style: italic;
 }
 
+/* Dimmed help key — matches the diluted look of the unlocked padlock on the
+   main screen. */
+.help-key-dim {
+    opacity: 0.4;
+    filter: grayscale(0.4);
+}
+
 .help-sublist {
     list-style: none;
     margin: 6px 0 0;
