@@ -1055,47 +1055,60 @@
 
     // ===== TRUE OPTIMIZATION: Distance Matrix + Nearest-Neighbor + 2-opt =====
 
-    // Get a driving-time distance matrix for a set of points (origin + stops + destination)
-    // points is an array of address strings. Returns a 2D array of durations in seconds.
-    // Google's Distance Matrix allows max 25 origins x 25 destinations per request,
-    // and 100 elements per request, so we chunk as needed.
-    async function getDistanceMatrix(points) {
-        const service = new google.maps.DistanceMatrixService();
-        const n = points.length;
-        const matrix = Array.from({ length: n }, () => new Array(n).fill(Infinity));
+    // Geocode cache to avoid re-geocoding the same address
+    const _geoCache = {};
 
-        // Chunk origins so origins*destinations <= 100 and origins <= 25, destinations <= 25
-        const MAX_ORIGINS = 10; // 10 x 10 = 100 elements per request (safe)
-        const MAX_DESTS = 10;
+    // Geocode an address to {lat, lng} using the Geocoding API (already enabled).
+    async function geocodeAddress(addr) {
+        const key = addr.trim().toLowerCase();
+        if (_geoCache[key]) return _geoCache[key];
 
-        for (let oStart = 0; oStart < n; oStart += MAX_ORIGINS) {
-            const originChunk = points.slice(oStart, oStart + MAX_ORIGINS);
-            for (let dStart = 0; dStart < n; dStart += MAX_DESTS) {
-                const destChunk = points.slice(dStart, dStart + MAX_DESTS);
-
-                const response = await new Promise((resolve) => {
-                    service.getDistanceMatrix({
-                        origins: originChunk,
-                        destinations: destChunk,
-                        travelMode: google.maps.TravelMode.DRIVING,
-                    }, (res, status) => {
-                        if (status === 'OK') resolve(res);
-                        else resolve(null);
+        const geocoder = new google.maps.Geocoder();
+        const coords = await new Promise((resolve) => {
+            geocoder.geocode({ address: addr }, (results, status) => {
+                if (status === 'OK' && results[0]) {
+                    resolve({
+                        lat: results[0].geometry.location.lat(),
+                        lng: results[0].geometry.location.lng(),
                     });
-                });
-
-                if (response) {
-                    response.rows.forEach((row, oi) => {
-                        row.elements.forEach((el, di) => {
-                            if (el.status === 'OK') {
-                                matrix[oStart + oi][dStart + di] = el.duration.value;
-                            }
-                        });
-                    });
+                } else {
+                    resolve(null);
                 }
+            });
+        });
+
+        if (coords) _geoCache[key] = coords;
+        return coords;
+    }
+
+    // Haversine distance (in meters) between two lat/lng points.
+    function haversine(a, b) {
+        if (!a || !b) return Infinity;
+        const R = 6371000; // Earth radius in meters
+        const toRad = d => d * Math.PI / 180;
+        const dLat = toRad(b.lat - a.lat);
+        const dLng = toRad(b.lng - a.lng);
+        const lat1 = toRad(a.lat);
+        const lat2 = toRad(b.lat);
+        const h = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
+        return 2 * R * Math.asin(Math.sqrt(h));
+    }
+
+    // Build a distance matrix from straight-line (haversine) distances between points.
+    // Uses only the Geocoding API (already enabled) — no Distance Matrix API needed.
+    // points is an array of address strings. Returns a 2D array of distances in meters.
+    async function getDistanceMatrix(points) {
+        const n = points.length;
+        // Geocode all points (cached)
+        const coords = await Promise.all(points.map(p => geocodeAddress(p)));
+
+        const matrix = Array.from({ length: n }, () => new Array(n).fill(0));
+        for (let i = 0; i < n; i++) {
+            for (let j = 0; j < n; j++) {
+                if (i === j) { matrix[i][j] = 0; continue; }
+                matrix[i][j] = haversine(coords[i], coords[j]);
             }
         }
-
         return matrix;
     }
 
@@ -1429,9 +1442,9 @@
             const busAddresses = busStops.map(s => s.address.trim());
             const otherAddresses = otherStops.map(s => s.address.trim());
 
-            // Step 2: True-optimize each type group (Distance Matrix + 2-opt)
-            // For groups larger than the matrix chunk limits, optimizeGroup still works
-            // (getDistanceMatrix chunks internally), but 2-opt on very large N is capped.
+            // Step 2: True-optimize each type group (haversine matrix + 2-opt)
+            // Uses geocoded straight-line distances (Geocoding API only), then
+            // nearest-neighbor + 2-opt. 2-opt on very large N is capped for performance.
             let orderedBus = [];
             let orderedOther = [];
 
