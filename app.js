@@ -104,7 +104,7 @@
         stopEl.className = 'input-row' + (advancedUI ? ' row-default' : '');
         stopEl.dataset.id = stopId;
         stopEl.innerHTML = `
-            <button class="pin-btn" aria-label="Lock this stop" data-id="${stopId}" title="Tap to lock this stop in place">🔓</button>
+            <button class="pin-btn" aria-label="Lock this stop" data-id="${stopId}" title="Tap to lock this stop in place">${lockIcon(false)}</button>
             <span class="stop-number" data-id="${stopId}">${index + 1}</span>
             <input type="text" class="stop-input" placeholder="Enter destination address" autocomplete="new-password" data-id="${stopId}">
             <span class="drag-handle" data-id="${stopId}">≡</span>
@@ -132,6 +132,17 @@
         input.focus();
     }
 
+    // Inline SVG padlock icons so the lock looks identical on every platform
+    // (emoji 🔓/🔒 render differently on Apple vs Windows/Android).
+    // Open padlock: shackle swung out to the side (clearly "unlocked").
+    const LOCK_OPEN_SVG = '<svg class="lock-svg" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M7 10V7a5 5 0 0 1 9.9-1" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><rect x="4" y="10" width="12" height="9" rx="2" fill="currentColor"/></svg>';
+    // Closed padlock: shackle down and locked.
+    const LOCK_CLOSED_SVG = '<svg class="lock-svg" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M8 10V7a4 4 0 0 1 8 0v3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><rect x="5" y="10" width="14" height="10" rx="2" fill="currentColor"/></svg>';
+
+    function lockIcon(isLocked) {
+        return isLocked ? LOCK_CLOSED_SVG : LOCK_OPEN_SVG;
+    }
+
     function togglePin(id) {
         const stop = stops.find(s => s.id === id);
         if (!stop) return;
@@ -140,12 +151,12 @@
         const row = stopsContainer.querySelector(`[data-id="${id}"]`);
         const pinBtn = row.querySelector('.pin-btn');
         if (stop.pinned) {
-            pinBtn.textContent = '🔒';
+            pinBtn.innerHTML = lockIcon(true);
             pinBtn.title = 'Locked — tap to unlock';
             pinBtn.classList.add('locked');
             row.classList.add('pinned');
         } else {
-            pinBtn.textContent = '🔓';
+            pinBtn.innerHTML = lockIcon(false);
             pinBtn.title = 'Tap to lock this stop in place';
             pinBtn.classList.remove('locked');
             row.classList.remove('pinned');
@@ -346,7 +357,7 @@
     }
 
     // App version tag in settings (keep in sync with sw.js CACHE_NAME)
-    const APP_VERSION = 'v156';
+    const APP_VERSION = 'v157';
     const appVersionEl = document.getElementById('app-version');
     if (appVersionEl) appVersionEl.textContent = APP_VERSION;
 
@@ -2091,7 +2102,7 @@
             stopEl.className = 'input-row' + (stop.pinned ? ' pinned' : '') + (stop.rush ? ' rush' : '') + (advancedUI ? (stop.type === 'bus' ? ' row-bus' : stop.type === 'res' ? ' row-res' : ' row-default') : '');
             stopEl.dataset.id = stop.id;
             stopEl.innerHTML = `
-                <button class="pin-btn ${stop.pinned ? 'locked' : ''}" aria-label="Lock this stop" data-id="${stop.id}" title="${stop.pinned ? 'Locked — tap to unlock' : 'Tap to lock this stop in place'}">${stop.pinned ? '🔒' : '🔓'}</button>
+                <button class="pin-btn ${stop.pinned ? 'locked' : ''}" aria-label="Lock this stop" data-id="${stop.id}" title="${stop.pinned ? 'Locked — tap to unlock' : 'Tap to lock this stop in place'}">${lockIcon(stop.pinned)}</button>
                 <span class="stop-number ${stop.type === 'bus' ? 'stop-num-bus' : stop.type === 'res' ? 'stop-num-res' : ''}" data-id="${stop.id}">${index + 1}</span>
                 <input type="text" class="stop-input" placeholder="Enter destination address" autocomplete="new-password" data-id="${stop.id}" value="${stop.address}">
                 <span class="drag-handle" data-id="${stop.id}">≡</span>
@@ -2512,7 +2523,7 @@
             stopEl.dataset.id = stopId;
             const numClass = type === 'bus' ? 'stop-num-bus' : type === 'res' ? 'stop-num-res' : '';
             stopEl.innerHTML = `
-                <button class="pin-btn ${pinned ? 'locked' : ''}" aria-label="Lock this stop" data-id="${stopId}" title="${pinned ? 'Locked — tap to unlock' : 'Tap to lock this stop in place'}">${pinned ? '🔒' : '🔓'}</button>
+                <button class="pin-btn ${pinned ? 'locked' : ''}" aria-label="Lock this stop" data-id="${stopId}" title="${pinned ? 'Locked — tap to unlock' : 'Tap to lock this stop in place'}">${lockIcon(pinned)}</button>
                 <span class="stop-number ${numClass}" data-id="${stopId}">${index + 1}</span>
                 <input type="text" class="stop-input" placeholder="Enter destination address" autocomplete="new-password" data-id="${stopId}" value="${address}">
                 <span class="drag-handle" data-id="${stopId}">≡</span>
@@ -2712,7 +2723,7 @@
             stopEl.dataset.id = stopId;
             const numClass = type === 'bus' ? 'stop-num-bus' : type === 'res' ? 'stop-num-res' : '';
             stopEl.innerHTML = `
-                <button class="pin-btn ${pinned ? 'locked' : ''}" aria-label="Lock this stop" data-id="${stopId}" title="${pinned ? 'Locked — tap to unlock' : 'Tap to lock this stop in place'}">${pinned ? '🔒' : '🔓'}</button>
+                <button class="pin-btn ${pinned ? 'locked' : ''}" aria-label="Lock this stop" data-id="${stopId}" title="${pinned ? 'Locked — tap to unlock' : 'Tap to lock this stop in place'}">${lockIcon(pinned)}</button>
                 <span class="stop-number ${numClass}" data-id="${stopId}">${index + 1}</span>
                 <input type="text" class="stop-input" placeholder="Enter destination address" autocomplete="new-password" data-id="${stopId}" value="${address}">
                 <span class="drag-handle" data-id="${stopId}">≡</span>

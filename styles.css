@@ -1121,28 +1121,35 @@ body {
 .pin-btn {
     background: none;
     border: none;
-    font-size: 1rem;
     cursor: pointer;
-    padding: 4px;
+    padding: 5px;
     border-radius: 4px;
     transition: background 0.2s, opacity 0.2s;
     flex-shrink: 0;
-    /* Unlocked (neutral) state: dimmed and slightly desaturated so it clearly
-       reads as inactive vs the locked state. */
-    opacity: 0.4;
-    filter: grayscale(0.4);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 0;
+    /* Unlocked (neutral) state: muted gray so it clearly reads as inactive
+       vs the locked state. */
+    color: var(--text-secondary);
+    opacity: 0.7;
+}
+
+.pin-btn .lock-svg {
+    display: block;
 }
 
 .pin-btn:hover {
     background: rgba(128,128,128,0.15);
-    opacity: 0.7;
+    opacity: 1;
 }
 
-/* Locked state: full color + an accent-tinted highlight so it's obvious the
+/* Locked state: accent color + a tinted highlight so it's obvious the
    stop is locked in place. */
 .pin-btn.locked {
     opacity: 1;
-    filter: none;
+    color: var(--primary);
     background: rgba(26, 115, 232, 0.15);
 }
 
