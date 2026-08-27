@@ -650,6 +650,16 @@ body {
     vertical-align: baseline;
 }
 
+.help-example {
+    display: block;
+    margin-top: 6px;
+    padding-left: 10px;
+    border-left: 2px solid var(--border);
+    font-size: 0.85em;
+    color: var(--text-secondary);
+    font-style: italic;
+}
+
 .help-sublist {
     list-style: none;
     margin: 6px 0 0;
