@@ -1535,14 +1535,24 @@
                 batch.pop();
             }
 
+            // Check if this batch has pinned stops or mixed types
+            const batchHasPins = batch.some(g => g.stop.pinned);
+            const batchHasBus = batch.some(g => g.stop.type === 'bus');
+            const batchHasOther = batch.some(g => g.stop.type !== 'bus');
+            const batchMixed = batchHasBus && batchHasOther;
+
             const waypoints = batch.map(g => g.stop.address.trim());
+
+            // Optimize within batch when safe (no pins, single type)
+            // If pinned or mixed, preserve order (businesses stay before residences)
+            const canOptimize = !batchHasPins && !batchMixed;
 
             const result = await new Promise((resolve) => {
                 directionsService.route({
                     origin: batchOrigin,
                     destination: batchDest,
                     waypoints: waypoints.map(addr => ({ location: addr, stopover: true })),
-                    optimizeWaypoints: false,
+                    optimizeWaypoints: canOptimize,
                     travelMode: google.maps.TravelMode.DRIVING,
                 }, (res, status) => {
                     if (status === google.maps.DirectionsStatus.OK) {
@@ -1555,7 +1565,14 @@
             });
 
             if (result) {
-                batchResults.push({ result, batchOrigin, batchDest, batchStops: batch });
+                // Reorder batch stops to match Google's optimized waypoint order
+                if (canOptimize && result.routes[0].waypoint_order) {
+                    const order = result.routes[0].waypoint_order;
+                    const reorderedBatch = order.map(i => batch[i]);
+                    batchResults.push({ result, batchOrigin, batchDest, batchStops: reorderedBatch });
+                } else {
+                    batchResults.push({ result, batchOrigin, batchDest, batchStops: batch });
+                }
             }
 
             // Next batch starts where this one ends
@@ -1564,7 +1581,12 @@
 
         // Step 5: Display all batches on map
         if (batchResults.length > 0) {
-            displayBatchedRoute(batchResults, origin, finalOrder);
+            // Rebuild finalOrder from the (possibly reordered) batch stops
+            const rebuiltOrder = [];
+            batchResults.forEach(br => {
+                br.batchStops.forEach(g => rebuiltOrder.push(g));
+            });
+            displayBatchedRoute(batchResults, origin, rebuiltOrder);
         } else {
             alert('Route optimization failed. Please try fewer stops.');
         }
