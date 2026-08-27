@@ -103,6 +103,28 @@ body {
     margin: 0;
 }
 
+/* Help modal: the "How to use" title scrolls away with the content, but the
+   close (X) stays pinned to the top-right corner of the scrolling box. */
+.help-header {
+    margin: 0 0 12px;
+    padding-right: 32px; /* leave room for the floating close button */
+}
+
+.help-header h2 {
+    margin: 0;
+}
+
+.help-close {
+    position: sticky;
+    top: 4px;
+    display: block;
+    margin-left: auto;
+    margin-bottom: -32px; /* pull the title up so the button overlaps its row */
+    z-index: 3;
+    background: var(--surface);
+    border-radius: 50%;
+}
+
 .history-list {
     flex: 1;
     overflow-y: auto;
