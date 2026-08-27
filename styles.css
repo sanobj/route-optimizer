@@ -124,6 +124,16 @@ body {
 
 .help-header h2 {
     margin: 0;
+    line-height: 1.2;
+}
+
+/* Keep the X visually centered on the title's row despite its larger
+   padding, and pull it flush to the right edge. */
+.help-header .icon-btn {
+    padding: 4px;
+    margin: -4px -4px -4px 0;
+    line-height: 1;
+    align-self: center;
 }
 
 .help-body {
