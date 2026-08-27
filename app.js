@@ -324,12 +324,10 @@
     const helpBtn = document.getElementById('help-btn');
     const helpModal = document.getElementById('help-modal');
     const closeHelpBtn = document.getElementById('close-help-btn');
-    const closeHelpBtn2 = document.getElementById('close-help-btn-2');
     if (helpBtn && helpModal) {
         helpBtn.addEventListener('click', () => helpModal.classList.remove('hidden'));
         const closeHelp = () => helpModal.classList.add('hidden');
         if (closeHelpBtn) closeHelpBtn.addEventListener('click', closeHelp);
-        if (closeHelpBtn2) closeHelpBtn2.addEventListener('click', closeHelp);
         helpModal.addEventListener('click', (e) => {
             if (e.target === helpModal) closeHelp();
         });
@@ -346,7 +344,7 @@
     }
 
     // App version tag in settings (keep in sync with sw.js CACHE_NAME)
-    const APP_VERSION = 'v148';
+    const APP_VERSION = 'v149';
     const appVersionEl = document.getElementById('app-version');
     if (appVersionEl) appVersionEl.textContent = APP_VERSION;
 

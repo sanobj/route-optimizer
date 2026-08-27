@@ -103,26 +103,29 @@ body {
     margin: 0;
 }
 
-/* Help modal: the "How to use" title scrolls away with the content, but the
-   close (X) stays pinned to the top-right corner of the scrolling box. */
+/* Help modal: a solid header bar (title + X) stays pinned to the top while
+   the body scrolls beneath it, so the X never floats over the text. */
 .help-header {
-    margin: 0 0 12px;
-    padding-right: 32px; /* leave room for the floating close button */
+    position: sticky;
+    top: 0;
+    z-index: 3;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--surface);
+    /* span the modal's 24px padding so the bar reaches the edges */
+    margin: -24px -24px 0;
+    padding: 16px 24px;
+    border-bottom: 1px solid var(--border);
+    border-radius: var(--radius) var(--radius) 0 0;
 }
 
 .help-header h2 {
     margin: 0;
 }
 
-.help-close {
-    position: sticky;
-    top: 4px;
-    display: block;
-    margin-left: auto;
-    margin-bottom: -32px; /* pull the title up so the button overlaps its row */
-    z-index: 3;
-    background: var(--surface);
-    border-radius: 50%;
+.help-body {
+    padding-top: 16px;
 }
 
 .history-list {
