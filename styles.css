@@ -601,9 +601,17 @@ body {
     background: #9c27b0;
 }
 
+/* Rush: keep the box color (bus orange / res purple) but turn the number gold.
+   A gold ring + text shadow keeps it legible against orange/purple boxes. */
 .breakdown-label.breakdown-rush {
-    background: var(--warning);
-    color: #000;
+    color: #ffd700;
+    box-shadow: inset 0 0 0 2px #ffd700;
+    text-shadow: 0 0 2px rgba(0, 0, 0, 0.6);
+}
+
+/* Rush with no type (plain stop) still needs a visible box */
+.breakdown-label.breakdown-rush:not(.breakdown-bus):not(.breakdown-res) {
+    background: #555;
 }
 
 .breakdown-arrow {
