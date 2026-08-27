@@ -291,14 +291,17 @@ body {
 }
 
 /* The (i) help button is a text glyph, not an emoji — give it the accent
-   color so it stays visible in both light and dark themes. */
+   color so it stays visible in both light and dark themes. Force text
+   presentation so platforms don't render it as a dark emoji that ignores color. */
 #help-btn {
     color: var(--primary);
     filter: none;
+    font-variant-emoji: text;
+    font-weight: 700;
 }
 
 [data-theme="dark"] #help-btn {
-    color: var(--primary);
+    color: #6cb6ff;
     filter: none;
 }
 
@@ -415,10 +418,23 @@ body {
     padding: 24px;
     width: 100%;
     max-width: 400px;
+    position: relative;
 }
 
 .modal-content h2 {
     margin-bottom: 16px;
+}
+
+/* Version tag — pinned to the top-right of the settings modal without
+   affecting layout of anything around it. */
+.app-version {
+    position: absolute;
+    top: 24px;
+    right: 24px;
+    font-size: 0.72rem;
+    color: var(--text-secondary);
+    font-weight: 600;
+    pointer-events: none;
 }
 
 .modal-content label {

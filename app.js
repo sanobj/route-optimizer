@@ -345,6 +345,11 @@
         });
     }
 
+    // App version tag in settings (keep in sync with sw.js CACHE_NAME)
+    const APP_VERSION = 'v140';
+    const appVersionEl = document.getElementById('app-version');
+    if (appVersionEl) appVersionEl.textContent = APP_VERSION;
+
     // API key setup info toggle
     const apiKeyInfoBtn = document.getElementById('api-key-info-btn');
     const apiKeyInfo = document.getElementById('api-key-info');
