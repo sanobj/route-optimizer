@@ -675,7 +675,7 @@ body {
 /* Dimmed help key — matches the diluted look of the unlocked padlock on the
    main screen. */
 .help-key-dim {
-    opacity: 0.4;
+    opacity: 0.5;
     filter: grayscale(0.4);
 }
 
@@ -1146,7 +1146,7 @@ body {
     flex-shrink: 0;
     /* Unlocked (neutral) state: dimmed and slightly desaturated so it clearly
        reads as inactive vs the locked state. Icon keeps its natural color. */
-    opacity: 0.4;
+    opacity: 0.5;
     filter: grayscale(0.4);
 }
 
