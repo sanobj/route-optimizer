@@ -87,6 +87,16 @@ body {
     align-items: center;
     justify-content: space-between;
     margin-bottom: 8px;
+    /* Stay pinned to the top while the modal body scrolls, so the close (X)
+       is always reachable. Negative margins + padding make it span the
+       modal's 24px padding and cover content scrolling underneath. */
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: var(--surface);
+    margin: -24px -24px 8px;
+    padding: 20px 24px 12px;
+    border-radius: var(--radius) var(--radius) 0 0;
 }
 
 .modal-header h2 {
