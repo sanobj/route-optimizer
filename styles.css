@@ -283,10 +283,23 @@ body {
     padding: 8px;
     border-radius: 50%;
     transition: background 0.2s;
+    color: var(--text);
 }
 
 [data-theme="dark"] .icon-btn {
     filter: brightness(1.5) saturate(1.5);
+}
+
+/* The (i) help button is a text glyph, not an emoji — give it the accent
+   color so it stays visible in both light and dark themes. */
+#help-btn {
+    color: var(--primary);
+    filter: none;
+}
+
+[data-theme="dark"] #help-btn {
+    color: var(--primary);
+    filter: none;
 }
 
 .icon-btn:hover {
