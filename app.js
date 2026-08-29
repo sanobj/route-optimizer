@@ -352,7 +352,7 @@
     }
 
     // App version tag in settings (keep in sync with sw.js CACHE_NAME)
-    const APP_VERSION = 'v176';
+    const APP_VERSION = 'v177';
     const appVersionEl = document.getElementById('app-version');
     if (appVersionEl) appVersionEl.textContent = APP_VERSION;
 
@@ -1302,18 +1302,20 @@
             let orderedBus = [];
             let orderedOther = [];
 
-            // Optimize business group: origin → businesses → (first residence or destination)
+            // Optimize business group: origin → businesses
+            // Use the overall destination as the endpoint for the bus group optimization.
+            // This is imperfect but avoids the chicken-and-egg of needing to know where
+            // the res group starts before we know where buses end.
             if (busAddresses.length > 0) {
-                const busEnd = otherAddresses.length > 0
-                    ? await pickClosestToGroup(busAddresses, otherAddresses, origin)
-                    : destination;
+                const busEnd = destination || (otherAddresses.length > 0 ? otherAddresses[0] : origin);
                 orderedBus = await optimizeGroup(origin, busAddresses, busEnd);
             }
 
             // Optimize residence group: last business (or origin) → residences → destination
             if (otherAddresses.length > 0) {
                 const resStart = orderedBus.length > 0 ? orderedBus[orderedBus.length - 1] : origin;
-                orderedOther = await optimizeGroup(resStart, otherAddresses, destination);
+                const resDest = destination || otherAddresses[otherAddresses.length - 1];
+                orderedOther = await optimizeGroup(resStart, otherAddresses, resDest);
             }
 
             const finalWaypoints = [...orderedBus, ...orderedOther];
@@ -1342,12 +1344,23 @@
         }
     }
 
-    // Pick the business address whose position best bridges to the residence group.
-    // Returns the residence address closest to the business cluster (used as bus segment end).
+    // Pick the residence address that is geographically closest to the last business,
+    // so the bus→res handoff doesn't jump across the map.
     async function pickClosestToGroup(busAddresses, otherAddresses, origin) {
-        // Use the first residence as the bridge target — the bus group will be
-        // optimized to end near it. Simple and deterministic.
-        return otherAddresses[0];
+        if (otherAddresses.length <= 1) return otherAddresses[0];
+        // Geocode the last bus address and all residences, pick the nearest one.
+        const lastBusCoord = await geocodeAddress(busAddresses[busAddresses.length - 1]);
+        if (!lastBusCoord) return otherAddresses[0]; // fallback
+
+        let bestIdx = 0;
+        let bestDist = Infinity;
+        for (let i = 0; i < otherAddresses.length; i++) {
+            const c = await geocodeAddress(otherAddresses[i]);
+            if (!c) continue;
+            const d = haversine(lastBusCoord, c);
+            if (d < bestDist) { bestDist = d; bestIdx = i; }
+        }
+        return otherAddresses[bestIdx];
     }
 
     function optimizeWithSegments(origin, destination, filledStops) {
@@ -1983,7 +1996,6 @@
                         `<button type="button" class="arrival-clock-btn" aria-label="Set arrival time">🕐 Arrive by…</button>` +
                         `<div class="arrival-input-row hidden">` +
                             `<input type="time" class="arrival-time-input" aria-label="Target arrival time">` +
-                            `<button type="button" class="arrival-calc-btn">Go</button>` +
                         `</div>` +
                         `<div class="arrival-result hidden"></div>` +
                     `</div>`;
@@ -1993,7 +2005,6 @@
                 const clockBtn = split.querySelector('.arrival-clock-btn');
                 const inputRow = split.querySelector('.arrival-input-row');
                 const timeInput = split.querySelector('.arrival-time-input');
-                const calcBtn = split.querySelector('.arrival-calc-btn');
                 const resultEl = split.querySelector('.arrival-result');
 
                 clockBtn.addEventListener('click', (ev) => {
@@ -2019,11 +2030,10 @@
                     const driveMin = Math.round(aboveDur / 60);
                     resultEl.innerHTML =
                         `Leave by <strong>${startStr}</strong>` +
-                        `<span class="arrival-detail">${driveMin} min driving + ${bufferMin} min at ${stopsBefore} stop${stopsBefore === 1 ? '' : 's'}</span>`;
+                        `<span class="arrival-detail">${driveMin} min driving + ${bufferMin} min buffer at ${stopsBefore} stop${stopsBefore === 1 ? '' : 's'}</span>`;
                     resultEl.classList.remove('hidden');
                 };
 
-                calcBtn.addEventListener('click', computeStart);
                 timeInput.addEventListener('change', computeStart);
                 // Prevent taps inside the input row from bubbling to the stop toggle
                 inputRow.addEventListener('click', (ev) => ev.stopPropagation());
