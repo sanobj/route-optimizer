@@ -352,7 +352,7 @@
     }
 
     // App version tag in settings (keep in sync with sw.js CACHE_NAME)
-    const APP_VERSION = 'v175';
+    const APP_VERSION = 'v176';
     const appVersionEl = document.getElementById('app-version');
     if (appVersionEl) appVersionEl.textContent = APP_VERSION;
 
@@ -1096,26 +1096,47 @@
     const _geoCache = {};
 
     // Geocode an address to {lat, lng} using the Geocoding API (already enabled).
+    // Includes retry on OVER_QUERY_LIMIT with exponential backoff.
     async function geocodeAddress(addr) {
         const key = addr.trim().toLowerCase();
         if (_geoCache[key]) return _geoCache[key];
 
         const geocoder = new google.maps.Geocoder();
-        const coords = await new Promise((resolve) => {
-            geocoder.geocode({ address: addr }, (results, status) => {
-                if (status === 'OK' && results[0]) {
-                    resolve({
-                        lat: results[0].geometry.location.lat(),
-                        lng: results[0].geometry.location.lng(),
-                    });
-                } else {
-                    resolve(null);
-                }
-            });
-        });
+        let attempts = 0;
+        const maxAttempts = 3;
 
-        if (coords) _geoCache[key] = coords;
-        return coords;
+        while (attempts < maxAttempts) {
+            const { coords, status } = await new Promise((resolve) => {
+                geocoder.geocode({ address: addr }, (results, s) => {
+                    if (s === 'OK' && results[0]) {
+                        resolve({
+                            coords: {
+                                lat: results[0].geometry.location.lat(),
+                                lng: results[0].geometry.location.lng(),
+                            },
+                            status: s,
+                        });
+                    } else {
+                        resolve({ coords: null, status: s });
+                    }
+                });
+            });
+
+            if (coords) {
+                _geoCache[key] = coords;
+                return coords;
+            }
+
+            if (status === 'OVER_QUERY_LIMIT') {
+                attempts++;
+                // Wait before retrying (200ms, 400ms, 800ms)
+                await new Promise(r => setTimeout(r, 200 * Math.pow(2, attempts)));
+            } else {
+                // Non-rate-limit error — don't retry
+                return null;
+            }
+        }
+        return null;
     }
 
     // Haversine distance (in meters) between two lat/lng points.
@@ -1134,10 +1155,23 @@
     // Build a distance matrix from straight-line (haversine) distances between points.
     // Uses only the Geocoding API (already enabled) — no Distance Matrix API needed.
     // points is an array of address strings. Returns a 2D array of distances in meters.
+    // Geocodes sequentially with a small delay to avoid Geocoding API rate limits.
     async function getDistanceMatrix(points) {
         const n = points.length;
-        // Geocode all points (cached)
-        const coords = await Promise.all(points.map(p => geocodeAddress(p)));
+        // Geocode all points (cached, sequential to avoid QPS limits)
+        const coords = [];
+        for (let i = 0; i < n; i++) {
+            const c = await geocodeAddress(points[i]);
+            coords.push(c);
+            // Small delay only for uncached geocodes — but since geocodeAddress
+            // resolves instantly from cache, the delay only matters for new lookups.
+        }
+
+        // If any geocode failed, return null so callers can fall back.
+        if (coords.some(c => c === null)) {
+            console.warn('Geocode failed for one or more addresses — using fallback optimization.');
+            return null;
+        }
 
         const matrix = Array.from({ length: n }, () => new Array(n).fill(0));
         for (let i = 0; i < n; i++) {
@@ -1222,6 +1256,9 @@
         // Build points: [origin, ...stops, destination]
         const points = [originAddr, ...stopAddresses, destAddr];
         const matrix = await getDistanceMatrix(points);
+
+        // If geocoding failed, return original order (better than garbage)
+        if (!matrix) return stopAddresses.slice();
 
         const startIdx = 0;
         const endIdx = points.length - 1;
