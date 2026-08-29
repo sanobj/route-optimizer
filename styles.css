@@ -874,6 +874,75 @@ body {
     background: var(--danger);
 }
 
+/* Arrival-time clock inside the breakdown split */
+.split-arrival {
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px dashed var(--border);
+}
+
+.arrival-clock-btn {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 6px;
+    padding: 5px 10px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.arrival-input-row {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    margin-top: 8px;
+}
+
+.arrival-input-row.hidden {
+    display: none;
+}
+
+.arrival-time-input {
+    flex: 1;
+    padding: 6px 8px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--surface);
+    color: var(--text);
+    font-size: 0.85rem;
+    font-family: inherit;
+}
+
+.arrival-calc-btn {
+    padding: 6px 12px;
+    border: none;
+    border-radius: 6px;
+    background: var(--primary);
+    color: #fff;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.arrival-result {
+    margin-top: 8px;
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+.arrival-result.hidden {
+    display: none;
+}
+
+.arrival-detail {
+    display: block;
+    margin-top: 2px;
+    font-size: 0.78rem;
+    font-weight: 400;
+    color: var(--text-secondary);
+}
+
 /* Map Filter */
 .map-filter-row {
     display: flex;
