@@ -10,7 +10,7 @@
     <title>Route Optimizer</title>
     <link rel="manifest" href="manifest.json">
     <link rel="apple-touch-icon" href="icon-192.png">
-    <link rel="stylesheet" href="styles.css?v=177">
+    <link rel="stylesheet" href="styles.css?v=178">
 </head>
 <body>
     <div id="app">
@@ -64,7 +64,7 @@
                     <ul class="help-list">
                         <li>After optimizing, the summary shows your total distance and drive time, plus the number of stops. Tap it to open the full breakdown, which lists every stop in order with the distance and time between each one.</li>
                         <li>In the breakdown, tap any address to see how much time and distance to reach that stop, and how much still remains.</li>
-                        <li>Tap the 🕐 clock on a selected stop and enter a target arrival time — it tells you when to leave, factoring in drive time plus a 7 min buffer per stop along the way.</li>
+                        <li>Tap the 🕐 clock on a selected stop and enter a target arrival time — it tells you when to leave, factoring in drive time plus a 7-minute buffer for each stop before it.</li>
                     </ul>
 
                     <h3 class="help-heading">Map</h3>
@@ -187,6 +187,7 @@
                     <span class="marker end-marker">🔴</span>
                     <input type="text" id="end-input" placeholder="End location" autocomplete="new-password">
                     <button id="clear-end-btn" class="input-clear-btn" aria-label="Clear end">✕</button>
+                    <button id="end-gps-btn" class="icon-btn" aria-label="Use GPS for end">🎯</button>
                 </div>
             </div>
 
@@ -223,6 +224,6 @@
         </div>
     </div>
 
-    <script src="app.js?v=177"></script>
+    <script src="app.js?v=178"></script>
 </body>
 </html>

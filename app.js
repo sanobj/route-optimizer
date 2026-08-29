@@ -328,6 +328,56 @@
         );
     }
 
+    // GPS for end location
+    const endGpsBtn = document.getElementById('end-gps-btn');
+    if (endGpsBtn) {
+        endGpsBtn.addEventListener('click', getEndLocation);
+    }
+
+    function getEndLocation() {
+        if (!navigator.geolocation) {
+            alert('Geolocation is not supported by your browser.');
+            return;
+        }
+
+        endGpsBtn.textContent = '⏳';
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                const { latitude, longitude } = position.coords;
+                if (window.google && google.maps) {
+                    const geocoder = new google.maps.Geocoder();
+                    geocoder.geocode({ location: { lat: latitude, lng: longitude } }, (results, status) => {
+                        if (status === 'OK' && results[0]) {
+                            endInput.value = results[0].formatted_address;
+                        } else {
+                            endInput.value = `${latitude}, ${longitude}`;
+                        }
+                        endGpsBtn.textContent = '🎯';
+                        updateOptimizeButton();
+                    });
+                } else {
+                    endInput.value = `${latitude}, ${longitude}`;
+                    endGpsBtn.textContent = '🎯';
+                    updateOptimizeButton();
+                }
+            },
+            (error) => {
+                endGpsBtn.textContent = '🎯';
+                switch(error.code) {
+                    case error.PERMISSION_DENIED:
+                        alert('Location permission denied. Please enter your address manually.');
+                        break;
+                    case error.POSITION_UNAVAILABLE:
+                        alert('Location unavailable. Please enter your address manually.');
+                        break;
+                    default:
+                        alert('Could not get your location. Please enter your address manually.');
+                }
+            },
+            { enableHighAccuracy: true, timeout: 10000 }
+        );
+    }
+
     // Help modal (default-feature guide)
     const helpBtn = document.getElementById('help-btn');
     const helpModal = document.getElementById('help-modal');
@@ -352,7 +402,7 @@
     }
 
     // App version tag in settings (keep in sync with sw.js CACHE_NAME)
-    const APP_VERSION = 'v177';
+    const APP_VERSION = 'v178';
     const appVersionEl = document.getElementById('app-version');
     if (appVersionEl) appVersionEl.textContent = APP_VERSION;
 
