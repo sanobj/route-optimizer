@@ -402,7 +402,7 @@
     }
 
     // App version tag in settings (keep in sync with sw.js CACHE_NAME)
-    const APP_VERSION = 'v179';
+    const APP_VERSION = 'v180';
     const appVersionEl = document.getElementById('app-version');
     if (appVersionEl) appVersionEl.textContent = APP_VERSION;
 
@@ -1339,9 +1339,36 @@
         runTrueOptimization(origin, destination, filledStops);
     }
 
-    // True optimization using Distance Matrix + nearest-neighbor + 2-opt.
+    // Optimize a group with Google's real driving-time optimizer (optimizeWaypoints:true).
+    // Returns the group's stop addresses in optimal driving order between origin→dest.
+    // This uses actual road/traffic distances (Directions API) — far better than
+    // straight-line haversine for real geography (freeways, hills, one-way roads).
+    async function optimizeGroupGoogle(originAddr, stopAddresses, destAddr) {
+        if (stopAddresses.length === 0) return [];
+        if (stopAddresses.length === 1) return stopAddresses.slice();
+
+        const directionsService = new google.maps.DirectionsService();
+        const result = await new Promise((resolve) => {
+            directionsService.route({
+                origin: originAddr,
+                destination: destAddr,
+                waypoints: stopAddresses.map(addr => ({ location: addr, stopover: true })),
+                optimizeWaypoints: true,
+                travelMode: google.maps.TravelMode.DRIVING,
+            }, (res, status) => {
+                resolve(status === google.maps.DirectionsStatus.OK ? res : null);
+            });
+        });
+
+        if (!result) return stopAddresses.slice(); // fallback: original order
+        const order = result.routes[0].waypoint_order;
+        return order.map(i => stopAddresses[i]);
+    }
+
+    // True optimization using Google's real driving-time optimizer, per type group.
     // Businesses optimized first (origin → businesses), then residences
-    // (last business → residences → destination). Guarantees correct ordering.
+    // (last business → residences → destination). Guarantees bus-before-res ordering
+    // while using real road distances for the best in-group order.
     async function runTrueOptimization(origin, destination, filledStops) {
         try {
             const busStops = filledStops.filter(s => s.type === 'bus');
@@ -1352,20 +1379,18 @@
             let orderedBus = [];
             let orderedOther = [];
 
-            // Optimize business group: origin → businesses
-            // Use the overall destination as the endpoint for the bus group optimization.
-            // This is imperfect but avoids the chicken-and-egg of needing to know where
-            // the res group starts before we know where buses end.
+            // Optimize business group with Google: origin → businesses → (destination
+            // or, if there are residences, toward the residence cluster's first stop).
             if (busAddresses.length > 0) {
                 const busEnd = destination || (otherAddresses.length > 0 ? otherAddresses[0] : origin);
-                orderedBus = await optimizeGroup(origin, busAddresses, busEnd);
+                orderedBus = await optimizeGroupGoogle(origin, busAddresses, busEnd);
             }
 
-            // Optimize residence group: last business (or origin) → residences → destination
+            // Optimize residence group with Google: last business (or origin) → residences → destination
             if (otherAddresses.length > 0) {
                 const resStart = orderedBus.length > 0 ? orderedBus[orderedBus.length - 1] : origin;
                 const resDest = destination || otherAddresses[otherAddresses.length - 1];
-                orderedOther = await optimizeGroup(resStart, otherAddresses, resDest);
+                orderedOther = await optimizeGroupGoogle(resStart, otherAddresses, resDest);
             }
 
             const finalWaypoints = [...orderedBus, ...orderedOther];
@@ -1585,15 +1610,24 @@
             let orderedBus = [];
             let orderedOther = [];
 
+            // Use Google's real driving optimizer when a group fits within its
+            // 23-waypoint limit; fall back to haversine for very large groups.
+            const optimizeGroupBest = async (originAddr, addrs, destAddr) => {
+                if (addrs.length <= MAX_WAYPOINTS) {
+                    return await optimizeGroupGoogle(originAddr, addrs, destAddr);
+                }
+                return await optimizeGroup(originAddr, addrs, destAddr);
+            };
+
             const destForBus = otherAddresses.length > 0 ? otherAddresses[0] : (destination || origin);
             if (busAddresses.length > 0) {
-                orderedBus = await optimizeGroup(origin, busAddresses, destForBus);
+                orderedBus = await optimizeGroupBest(origin, busAddresses, destForBus);
             }
 
             const resStart = orderedBus.length > 0 ? orderedBus[orderedBus.length - 1] : origin;
             const destForRes = destination || resStart;
             if (otherAddresses.length > 0) {
-                orderedOther = await optimizeGroup(resStart, otherAddresses, destForRes);
+                orderedOther = await optimizeGroupBest(resStart, otherAddresses, destForRes);
             }
 
             // Combined optimized order (addresses)
