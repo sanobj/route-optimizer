@@ -402,7 +402,7 @@
     }
 
     // App version tag in settings (keep in sync with sw.js CACHE_NAME)
-    const APP_VERSION = 'v181';
+    const APP_VERSION = 'v182';
     const appVersionEl = document.getElementById('app-version');
     if (appVersionEl) appVersionEl.textContent = APP_VERSION;
 
@@ -1347,6 +1347,12 @@
         if (stopAddresses.length === 0) return [];
         if (stopAddresses.length === 1) return stopAddresses.slice();
 
+        // Google's optimizeWaypoints caps at 23 waypoints per request. For larger
+        // groups, fall back to the haversine matrix optimizer.
+        if (stopAddresses.length > 23) {
+            return await optimizeGroup(originAddr, stopAddresses, destAddr);
+        }
+
         const directionsService = new google.maps.DirectionsService();
         const result = await new Promise((resolve) => {
             directionsService.route({
@@ -1365,18 +1371,77 @@
         return order.map(i => stopAddresses[i]);
     }
 
-    // Compute the geographic centroid (avg lat/lng) of a list of addresses.
-    // Returns "lat,lng" string usable as a Directions endpoint, or null on failure.
-    async function centroidOf(addresses) {
+    // Shortest OPEN tour from a start through all stops with no fixed end.
+    // Uses haversine + nearest-neighbor + 2-opt (which naturally handles open tours)
+    // to decide the order and endpoint, then re-optimizes with Google's real
+    // driving-time optimizer using that endpoint fixed — so the ordering reflects
+    // actual roads, not straight-line distance.
+    async function optimizeOpenTour(startAddr, stopAddresses) {
+        if (stopAddresses.length === 0) return [];
+        if (stopAddresses.length === 1) return stopAddresses.slice();
+
+        // Step 1: pick an endpoint + rough order using an open-tour heuristic on
+        // real geography (geocode + haversine NN/2-opt with no closing leg).
+        const points = [startAddr, ...stopAddresses];
         const coords = [];
-        for (const a of addresses) {
-            const c = await geocodeAddress(a);
-            if (c) coords.push(c);
+        for (const p of points) coords.push(await geocodeAddress(p));
+
+        let endpointAddr = null;
+        if (!coords.some(c => c === null)) {
+            const n = points.length;
+            const matrix = Array.from({ length: n }, () => new Array(n).fill(0));
+            for (let i = 0; i < n; i++)
+                for (let j = 0; j < n; j++)
+                    matrix[i][j] = i === j ? 0 : haversine(coords[i], coords[j]);
+
+            const waypointIndices = stopAddresses.map((_, i) => i + 1);
+            // Open-tour cost: no return leg. Use a huge sentinel endIdx trick by
+            // scoring only the path cost (start→...→last), not a closing leg.
+            let route = nearestNeighborRoute(matrix, 0, waypointIndices, 0);
+            route = twoOptImproveOpen(matrix, 0, route);
+            endpointAddr = points[route[route.length - 1]];
         }
-        if (coords.length === 0) return null;
-        const lat = coords.reduce((s, c) => s + c.lat, 0) / coords.length;
-        const lng = coords.reduce((s, c) => s + c.lng, 0) / coords.length;
-        return `${lat},${lng}`;
+
+        // Step 2: if we found a good endpoint, let Google optimize the rest of the
+        // stops between start and that endpoint using real driving distances.
+        if (endpointAddr && stopAddresses.length >= 2) {
+            const middle = stopAddresses.filter(a => a !== endpointAddr);
+            const ordered = await optimizeGroupGoogle(startAddr, middle, endpointAddr);
+            return [...ordered, endpointAddr];
+        }
+
+        // Fallback: no geocode — just let Google optimize toward the last stop.
+        return await optimizeGroupGoogle(startAddr, stopAddresses.slice(0, -1), stopAddresses[stopAddresses.length - 1])
+            .then(ord => [...ord, stopAddresses[stopAddresses.length - 1]]);
+    }
+
+    // 2-opt for an OPEN tour (no closing leg back to an end index).
+    function twoOptImproveOpen(matrix, startIdx, route) {
+        const openCost = (r) => {
+            let cost = 0, prev = startIdx;
+            for (const idx of r) { cost += matrix[prev][idx]; prev = idx; }
+            return cost;
+        };
+        let best = route.slice();
+        let improved = true, iterations = 0;
+        const maxIterations = 50;
+        while (improved && iterations < maxIterations) {
+            improved = false;
+            iterations++;
+            for (let i = 0; i < best.length - 1; i++) {
+                for (let j = i + 1; j < best.length; j++) {
+                    const candidate = best.slice(0, i).concat(
+                        best.slice(i, j + 1).reverse(),
+                        best.slice(j + 1)
+                    );
+                    if (openCost(candidate) < openCost(best) - 0.5) {
+                        best = candidate;
+                        improved = true;
+                    }
+                }
+            }
+        }
+        return best;
     }
 
     // True optimization using Google's real driving-time optimizer, per type group.
@@ -1393,23 +1458,24 @@
             let orderedBus = [];
             let orderedOther = [];
 
-            // Optimize business group toward the residence cluster's centroid so the
-            // business ordering ends on the side facing the residences — this avoids a
-            // big backtrack at the bus→res handoff. Falls back to destination/origin.
+            // 1) Shortest BUSINESS route on its own: origin through all businesses,
+            //    open-ended (the last business falls wherever is most efficient).
+            //    We do NOT aim it at the residences — businesses are optimized purely
+            //    for the shortest business run.
             if (busAddresses.length > 0) {
-                let busEnd = destination;
-                if (!busEnd && otherAddresses.length > 0) {
-                    busEnd = await centroidOf(otherAddresses) || otherAddresses[0];
-                }
-                if (!busEnd) busEnd = origin;
-                orderedBus = await optimizeGroupGoogle(origin, busAddresses, busEnd);
+                orderedBus = await optimizeOpenTour(origin, busAddresses);
             }
 
-            // Optimize residence group with Google: last business (or origin) → residences → destination
+            // 2) Shortest RESIDENCE route: starts where the business route ended
+            //    (or origin if no businesses), through all residences to the destination.
+            //    If no fixed destination (No End), it's an open tour too.
             if (otherAddresses.length > 0) {
                 const resStart = orderedBus.length > 0 ? orderedBus[orderedBus.length - 1] : origin;
-                const resDest = destination || otherAddresses[otherAddresses.length - 1];
-                orderedOther = await optimizeGroupGoogle(resStart, otherAddresses, resDest);
+                if (destination) {
+                    orderedOther = await optimizeGroupGoogle(resStart, otherAddresses, destination);
+                } else {
+                    orderedOther = await optimizeOpenTour(resStart, otherAddresses);
+                }
             }
 
             const finalWaypoints = [...orderedBus, ...orderedOther];
@@ -1623,30 +1689,23 @@
             const busAddresses = busStops.map(s => s.address.trim());
             const otherAddresses = otherStops.map(s => s.address.trim());
 
-            // Step 2: True-optimize each type group (haversine matrix + 2-opt)
-            // Uses geocoded straight-line distances (Geocoding API only), then
-            // nearest-neighbor + 2-opt. 2-opt on very large N is capped for performance.
+            // Step 2: Optimize each type group independently.
+            // Businesses: shortest open-ended business route (not aimed at residences).
+            // Residences: shortest route from the last business through all residences.
             let orderedBus = [];
             let orderedOther = [];
 
-            // Use Google's real driving optimizer when a group fits within its
-            // 23-waypoint limit; fall back to haversine for very large groups.
-            const optimizeGroupBest = async (originAddr, addrs, destAddr) => {
-                if (addrs.length <= MAX_WAYPOINTS) {
-                    return await optimizeGroupGoogle(originAddr, addrs, destAddr);
-                }
-                return await optimizeGroup(originAddr, addrs, destAddr);
-            };
-
-            const destForBus = otherAddresses.length > 0 ? otherAddresses[0] : (destination || origin);
             if (busAddresses.length > 0) {
-                orderedBus = await optimizeGroupBest(origin, busAddresses, destForBus);
+                orderedBus = await optimizeOpenTour(origin, busAddresses);
             }
 
             const resStart = orderedBus.length > 0 ? orderedBus[orderedBus.length - 1] : origin;
-            const destForRes = destination || resStart;
             if (otherAddresses.length > 0) {
-                orderedOther = await optimizeGroupBest(resStart, otherAddresses, destForRes);
+                if (destination) {
+                    orderedOther = await optimizeGroupGoogle(resStart, otherAddresses, destination);
+                } else {
+                    orderedOther = await optimizeOpenTour(resStart, otherAddresses);
+                }
             }
 
             // Combined optimized order (addresses)
