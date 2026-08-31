@@ -402,7 +402,7 @@
     }
 
     // App version tag in settings (keep in sync with sw.js CACHE_NAME)
-    const APP_VERSION = 'v180';
+    const APP_VERSION = 'v181';
     const appVersionEl = document.getElementById('app-version');
     if (appVersionEl) appVersionEl.textContent = APP_VERSION;
 
@@ -1365,6 +1365,20 @@
         return order.map(i => stopAddresses[i]);
     }
 
+    // Compute the geographic centroid (avg lat/lng) of a list of addresses.
+    // Returns "lat,lng" string usable as a Directions endpoint, or null on failure.
+    async function centroidOf(addresses) {
+        const coords = [];
+        for (const a of addresses) {
+            const c = await geocodeAddress(a);
+            if (c) coords.push(c);
+        }
+        if (coords.length === 0) return null;
+        const lat = coords.reduce((s, c) => s + c.lat, 0) / coords.length;
+        const lng = coords.reduce((s, c) => s + c.lng, 0) / coords.length;
+        return `${lat},${lng}`;
+    }
+
     // True optimization using Google's real driving-time optimizer, per type group.
     // Businesses optimized first (origin → businesses), then residences
     // (last business → residences → destination). Guarantees bus-before-res ordering
@@ -1379,10 +1393,15 @@
             let orderedBus = [];
             let orderedOther = [];
 
-            // Optimize business group with Google: origin → businesses → (destination
-            // or, if there are residences, toward the residence cluster's first stop).
+            // Optimize business group toward the residence cluster's centroid so the
+            // business ordering ends on the side facing the residences — this avoids a
+            // big backtrack at the bus→res handoff. Falls back to destination/origin.
             if (busAddresses.length > 0) {
-                const busEnd = destination || (otherAddresses.length > 0 ? otherAddresses[0] : origin);
+                let busEnd = destination;
+                if (!busEnd && otherAddresses.length > 0) {
+                    busEnd = await centroidOf(otherAddresses) || otherAddresses[0];
+                }
+                if (!busEnd) busEnd = origin;
                 orderedBus = await optimizeGroupGoogle(origin, busAddresses, busEnd);
             }
 
