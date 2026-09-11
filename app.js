@@ -402,7 +402,7 @@
     }
 
     // App version tag in settings (keep in sync with sw.js CACHE_NAME)
-    const APP_VERSION = 'v184';
+    const APP_VERSION = 'v185';
     const appVersionEl = document.getElementById('app-version');
     if (appVersionEl) appVersionEl.textContent = APP_VERSION;
 
@@ -2295,13 +2295,58 @@
                     arrivalHtml = `<div class="split-arrival-result muted">Set a departure time above to see arrival.</div>`;
                 }
 
+                // "Arrive by" clock: enter a target arrival for THIS stop → when to leave.
+                const leadSecs = aboveDur + bufferSecs;
+
                 const split = document.createElement('div');
                 split.className = 'breakdown-split';
                 split.innerHTML =
                     `<div class="split-row"><span class="split-tag split-above">Above</span> ${formatDistanceMeters(aboveDist)} · ${formatDurationSecs(aboveDur)}</div>` +
                     `<div class="split-row"><span class="split-tag split-below">Below</span> ${formatDistanceMeters(belowDist)} · ${formatDurationSecs(belowDur)}</div>` +
-                    arrivalHtml;
+                    arrivalHtml +
+                    `<div class="split-arrive-by">` +
+                        `<button type="button" class="arrival-clock-btn" aria-label="Set arrival time">🕐 Arrive by…</button>` +
+                        `<div class="arrival-input-row hidden">` +
+                            `<input type="time" class="arrival-time-input" aria-label="Target arrival time">` +
+                        `</div>` +
+                        `<div class="arrival-result hidden"></div>` +
+                    `</div>`;
                 el.insertAdjacentElement('afterend', split);
+
+                // Wire up the "arrive by" clock
+                const clockBtn = split.querySelector('.arrival-clock-btn');
+                const inputRow = split.querySelector('.arrival-input-row');
+                const timeInput = split.querySelector('.arrival-time-input');
+                const resultEl = split.querySelector('.arrival-result');
+
+                clockBtn.addEventListener('click', (ev) => {
+                    ev.stopPropagation();
+                    inputRow.classList.toggle('hidden');
+                    if (!inputRow.classList.contains('hidden')) timeInput.focus();
+                });
+                inputRow.addEventListener('click', (ev) => ev.stopPropagation());
+
+                const computeLeave = (ev) => {
+                    if (ev) ev.stopPropagation();
+                    const val = timeInput.value; // "HH:MM"
+                    if (!val) {
+                        resultEl.textContent = 'Pick a time first.';
+                        resultEl.classList.remove('hidden');
+                        return;
+                    }
+                    const [hh, mm] = val.split(':').map(Number);
+                    const arrive = new Date();
+                    arrive.setHours(hh, mm, 0, 0);
+                    const leave = new Date(arrive.getTime() - leadSecs * 1000);
+                    const leaveStr = leave.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+                    const driveMin = Math.round(aboveDur / 60);
+                    const bufMin = Math.round(bufferSecs / 60);
+                    resultEl.innerHTML =
+                        `Leave by <strong>${leaveStr}</strong>` +
+                        `<span class="arrival-detail">${driveMin} min driving + ${bufMin} min buffer (${stopsBefore} stop${stopsBefore === 1 ? '' : 's'})</span>`;
+                    resultEl.classList.remove('hidden');
+                };
+                timeInput.addEventListener('change', computeLeave);
             });
         });
     }
