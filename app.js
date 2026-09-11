@@ -402,7 +402,7 @@
     }
 
     // App version tag in settings (keep in sync with sw.js CACHE_NAME)
-    const APP_VERSION = 'v182';
+    const APP_VERSION = 'v183';
     const appVersionEl = document.getElementById('app-version');
     if (appVersionEl) appVersionEl.textContent = APP_VERSION;
 
@@ -1415,6 +1415,107 @@
             .then(ord => [...ord, stopAddresses[stopAddresses.length - 1]]);
     }
 
+    // Optimize businesses first, then residences, choosing the business endpoint
+    // that minimizes the TOTAL combined route. Businesses always precede residences.
+    //
+    // Approach:
+    //  1. Geocode everything; build a haversine helper.
+    //  2. For each candidate business endpoint, estimate total cost using haversine:
+    //       origin →(best business order ending at candidate)→ candidate
+    //       + candidate → (best residence order) → destination
+    //     Estimate each leg with an open/closed nearest-neighbor + 2-opt on haversine.
+    //  3. Pick the candidate business endpoint with the lowest estimated total.
+    //  4. Do the REAL Google driving optimization for both legs using that endpoint.
+    async function optimizeBusThenRes(origin, busAddresses, otherAddresses, destination) {
+        // Geocode all points
+        const originCoord = await geocodeAddress(origin);
+        const busCoords = [];
+        for (const a of busAddresses) busCoords.push(await geocodeAddress(a));
+        const resCoords = [];
+        for (const a of otherAddresses) resCoords.push(await geocodeAddress(a));
+        const destCoord = destination ? await geocodeAddress(destination) : null;
+
+        const geocodeOk = originCoord && !busCoords.some(c => !c) && !resCoords.some(c => !c) && (!destination || destCoord);
+
+        // Helper: haversine open-tour cost from a start coord through a set of coords,
+        // returning { cost, order } where order is indices into the coords array.
+        const openTourCost = (startCoord, coords) => {
+            if (coords.length === 0) return { cost: 0, order: [] };
+            const n = coords.length;
+            const remaining = coords.map((_, i) => i);
+            const order = [];
+            let cur = startCoord;
+            let cost = 0;
+            while (remaining.length) {
+                let bi = 0, bd = Infinity;
+                for (let i = 0; i < remaining.length; i++) {
+                    const d = haversine(cur, coords[remaining[i]]);
+                    if (d < bd) { bd = d; bi = i; }
+                }
+                const next = remaining.splice(bi, 1)[0];
+                order.push(next);
+                cost += bd;
+                cur = coords[next];
+            }
+            return { cost, order };
+        };
+
+        // Helper: cost of a residence run from a start coord through all residences to destination.
+        const resRunCost = (startCoord) => {
+            const { cost, order } = openTourCost(startCoord, resCoords);
+            let total = cost;
+            if (destCoord && order.length) total += haversine(resCoords[order[order.length - 1]], destCoord);
+            return total;
+        };
+
+        let chosenBusEnd = null;
+
+        if (geocodeOk) {
+            // Try each business as the endpoint of the business leg; estimate total.
+            let bestTotal = Infinity;
+            for (let e = 0; e < busAddresses.length; e++) {
+                // Business leg: origin through all businesses, ending at business e.
+                // Estimate by: open tour of the other businesses, then hop to e.
+                const otherBusIdx = busCoords.map((_, i) => i).filter(i => i !== e);
+                const otherBusCoords = otherBusIdx.map(i => busCoords[i]);
+                const { cost: busCost, order } = openTourCost(originCoord, otherBusCoords);
+                let busLeg = busCost;
+                // hop from last of those to business e (or origin→e if e is the only business)
+                if (order.length) {
+                    busLeg += haversine(otherBusCoords[order[order.length - 1]], busCoords[e]);
+                } else {
+                    busLeg += haversine(originCoord, busCoords[e]);
+                }
+                // Residence leg starts at business e
+                const resLeg = resRunCost(busCoords[e]);
+                const total = busLeg + resLeg;
+                if (total < bestTotal) { bestTotal = total; chosenBusEnd = busAddresses[e]; }
+            }
+        }
+
+        // Real Google optimization using the chosen endpoint.
+        let orderedBus;
+        if (chosenBusEnd && busAddresses.length >= 2) {
+            const middle = busAddresses.filter(a => a !== chosenBusEnd);
+            const ord = await optimizeGroupGoogle(origin, middle, chosenBusEnd);
+            orderedBus = [...ord, chosenBusEnd];
+        } else if (busAddresses.length >= 2) {
+            orderedBus = await optimizeOpenTour(origin, busAddresses);
+        } else {
+            orderedBus = busAddresses.slice();
+        }
+
+        const resStart = orderedBus[orderedBus.length - 1];
+        let orderedRes;
+        if (destination) {
+            orderedRes = await optimizeGroupGoogle(resStart, otherAddresses, destination);
+        } else {
+            orderedRes = await optimizeOpenTour(resStart, otherAddresses);
+        }
+
+        return { bus: orderedBus, res: orderedRes };
+    }
+
     // 2-opt for an OPEN tour (no closing leg back to an end index).
     function twoOptImproveOpen(matrix, startIdx, route) {
         const openCost = (r) => {
@@ -1458,24 +1559,24 @@
             let orderedBus = [];
             let orderedOther = [];
 
-            // 1) Shortest BUSINESS route on its own: origin through all businesses,
-            //    open-ended (the last business falls wherever is most efficient).
-            //    We do NOT aim it at the residences — businesses are optimized purely
-            //    for the shortest business run.
-            if (busAddresses.length > 0) {
-                orderedBus = await optimizeOpenTour(origin, busAddresses);
-            }
-
-            // 2) Shortest RESIDENCE route: starts where the business route ended
-            //    (or origin if no businesses), through all residences to the destination.
-            //    If no fixed destination (No End), it's an open tour too.
-            if (otherAddresses.length > 0) {
-                const resStart = orderedBus.length > 0 ? orderedBus[orderedBus.length - 1] : origin;
-                if (destination) {
-                    orderedOther = await optimizeGroupGoogle(resStart, otherAddresses, destination);
-                } else {
-                    orderedOther = await optimizeOpenTour(resStart, otherAddresses);
-                }
+            // Businesses come first, residences second, but we choose the business
+            // ENDPOINT so the *combined* route is shortest — not just the business
+            // leg in isolation. Otherwise the business tour can end far from the
+            // residences and force a long jump, wrecking the overall time.
+            if (busAddresses.length > 0 && otherAddresses.length > 0) {
+                const combo = await optimizeBusThenRes(origin, busAddresses, otherAddresses, destination);
+                orderedBus = combo.bus;
+                orderedOther = combo.res;
+            } else if (busAddresses.length > 0) {
+                // Only businesses
+                orderedBus = destination
+                    ? await optimizeGroupGoogle(origin, busAddresses, destination)
+                    : await optimizeOpenTour(origin, busAddresses);
+            } else if (otherAddresses.length > 0) {
+                // Only residences
+                orderedOther = destination
+                    ? await optimizeGroupGoogle(origin, otherAddresses, destination)
+                    : await optimizeOpenTour(origin, otherAddresses);
             }
 
             const finalWaypoints = [...orderedBus, ...orderedOther];
