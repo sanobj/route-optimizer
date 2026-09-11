@@ -402,7 +402,7 @@
     }
 
     // App version tag in settings (keep in sync with sw.js CACHE_NAME)
-    const APP_VERSION = 'v185';
+    const APP_VERSION = 'v186';
     const appVersionEl = document.getElementById('app-version');
     if (appVersionEl) appVersionEl.textContent = APP_VERSION;
 
@@ -1468,52 +1468,105 @@
             return total;
         };
 
-        let chosenBusEnd = null;
-
+        // Rank candidate business endpoints by a fast haversine estimate of the
+        // TOTAL combined route (business leg ending at candidate + residence leg).
+        let candidates = busAddresses.map((addr, e) => ({ addr, e, est: Infinity }));
         if (geocodeOk) {
-            // Try each business as the endpoint of the business leg; estimate total.
-            let bestTotal = Infinity;
-            for (let e = 0; e < busAddresses.length; e++) {
-                // Business leg: origin through all businesses, ending at business e.
-                // Estimate by: open tour of the other businesses, then hop to e.
+            for (const cand of candidates) {
+                const e = cand.e;
                 const otherBusIdx = busCoords.map((_, i) => i).filter(i => i !== e);
                 const otherBusCoords = otherBusIdx.map(i => busCoords[i]);
                 const { cost: busCost, order } = openTourCost(originCoord, otherBusCoords);
                 let busLeg = busCost;
-                // hop from last of those to business e (or origin→e if e is the only business)
                 if (order.length) {
                     busLeg += haversine(otherBusCoords[order[order.length - 1]], busCoords[e]);
                 } else {
                     busLeg += haversine(originCoord, busCoords[e]);
                 }
-                // Residence leg starts at business e
-                const resLeg = resRunCost(busCoords[e]);
-                const total = busLeg + resLeg;
-                if (total < bestTotal) { bestTotal = total; chosenBusEnd = busAddresses[e]; }
+                cand.est = busLeg + resRunCost(busCoords[e]);
+            }
+            candidates.sort((a, b) => a.est - b.est);
+        }
+
+        // Helper: build the real Google-ordered bus+res route for a given business
+        // endpoint, and return { bus, res, seconds } using actual driving durations.
+        const buildAndMeasure = async (busEndAddr) => {
+            let bus;
+            if (busEndAddr && busAddresses.length >= 2) {
+                const middle = busAddresses.filter(a => a !== busEndAddr);
+                const ord = await optimizeGroupGoogle(origin, middle, busEndAddr);
+                bus = [...ord, busEndAddr];
+            } else if (busAddresses.length >= 2) {
+                bus = await optimizeOpenTour(origin, busAddresses);
+            } else {
+                bus = busAddresses.slice();
+            }
+            const rStart = bus[bus.length - 1];
+            let res;
+            if (destination) {
+                res = await optimizeGroupGoogle(rStart, otherAddresses, destination);
+            } else {
+                res = await optimizeOpenTour(rStart, otherAddresses);
+            }
+            // Measure the real combined driving time for this ordering.
+            const seconds = await measureRouteSeconds(origin, [...bus, ...res], destination);
+            return { bus, res, seconds };
+        };
+
+        // Verify the top few candidates with REAL driving times and keep the best.
+        // (Haversine ranking can be wrong; a few extra Directions calls fix that.)
+        const TObeat = geocodeOk ? Math.min(3, candidates.length) : 1;
+        let best = null;
+        if (candidates.length === 0) {
+            best = await buildAndMeasure(null);
+        } else {
+            for (let i = 0; i < TObeat; i++) {
+                const trial = await buildAndMeasure(candidates[i].addr);
+                if (!best || (trial.seconds != null && (best.seconds == null || trial.seconds < best.seconds))) {
+                    best = trial;
+                }
             }
         }
 
-        // Real Google optimization using the chosen endpoint.
-        let orderedBus;
-        if (chosenBusEnd && busAddresses.length >= 2) {
-            const middle = busAddresses.filter(a => a !== chosenBusEnd);
-            const ord = await optimizeGroupGoogle(origin, middle, chosenBusEnd);
-            orderedBus = [...ord, chosenBusEnd];
-        } else if (busAddresses.length >= 2) {
-            orderedBus = await optimizeOpenTour(origin, busAddresses);
-        } else {
-            orderedBus = busAddresses.slice();
-        }
+        return { bus: best.bus, res: best.res };
+    }
 
-        const resStart = orderedBus[orderedBus.length - 1];
-        let orderedRes;
-        if (destination) {
-            orderedRes = await optimizeGroupGoogle(resStart, otherAddresses, destination);
-        } else {
-            orderedRes = await optimizeOpenTour(resStart, otherAddresses);
-        }
+    // Measure the real total driving time (seconds) for a fixed-order route.
+    // Uses Directions with optimizeWaypoints:false so it reflects the exact order.
+    // Handles the 23-waypoint limit by chunking and summing.
+    async function measureRouteSeconds(origin, orderedStops, destination) {
+        try {
+            const directionsService = new google.maps.DirectionsService();
+            const MAXW = 23;
+            let total = 0;
+            let legOrigin = origin;
+            const stops = orderedStops.slice();
+            const finalDest = destination || stops.pop();
+            if (finalDest == null) return null;
 
-        return { bus: orderedBus, res: orderedRes };
+            for (let i = 0; i < stops.length || i === 0; i += MAXW) {
+                const chunk = stops.slice(i, i + MAXW);
+                const isLast = i + MAXW >= stops.length;
+                const dest = isLast ? finalDest : chunk[chunk.length - 1];
+                const wps = isLast ? chunk : chunk.slice(0, -1);
+                const res = await new Promise((resolve) => {
+                    directionsService.route({
+                        origin: legOrigin,
+                        destination: dest,
+                        waypoints: wps.map(a => ({ location: a, stopover: true })),
+                        optimizeWaypoints: false,
+                        travelMode: google.maps.TravelMode.DRIVING,
+                    }, (r, s) => resolve(s === google.maps.DirectionsStatus.OK ? r : null));
+                });
+                if (!res) return null;
+                res.routes[0].legs.forEach(l => { total += l.duration.value; });
+                legOrigin = dest;
+                if (isLast) break;
+            }
+            return total;
+        } catch (e) {
+            return null;
+        }
     }
 
     // 2-opt for an OPEN tour (no closing leg back to an end index).
@@ -1790,23 +1843,24 @@
             const busAddresses = busStops.map(s => s.address.trim());
             const otherAddresses = otherStops.map(s => s.address.trim());
 
-            // Step 2: Optimize each type group independently.
-            // Businesses: shortest open-ended business route (not aimed at residences).
-            // Residences: shortest route from the last business through all residences.
+            // Step 2: Optimize using the combined bus+res logic (same as small routes):
+            // choose the business endpoint that minimizes the TOTAL bus+res route,
+            // so the business leg ends where it best sets up the residence leg.
             let orderedBus = [];
             let orderedOther = [];
 
-            if (busAddresses.length > 0) {
-                orderedBus = await optimizeOpenTour(origin, busAddresses);
-            }
-
-            const resStart = orderedBus.length > 0 ? orderedBus[orderedBus.length - 1] : origin;
-            if (otherAddresses.length > 0) {
-                if (destination) {
-                    orderedOther = await optimizeGroupGoogle(resStart, otherAddresses, destination);
-                } else {
-                    orderedOther = await optimizeOpenTour(resStart, otherAddresses);
-                }
+            if (busAddresses.length > 0 && otherAddresses.length > 0) {
+                const combo = await optimizeBusThenRes(origin, busAddresses, otherAddresses, destination);
+                orderedBus = combo.bus;
+                orderedOther = combo.res;
+            } else if (busAddresses.length > 0) {
+                orderedBus = destination
+                    ? await optimizeGroupGoogle(origin, busAddresses, destination)
+                    : await optimizeOpenTour(origin, busAddresses);
+            } else if (otherAddresses.length > 0) {
+                orderedOther = destination
+                    ? await optimizeGroupGoogle(origin, otherAddresses, destination)
+                    : await optimizeOpenTour(origin, otherAddresses);
             }
 
             // Combined optimized order (addresses)
