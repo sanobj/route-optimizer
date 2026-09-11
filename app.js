@@ -402,7 +402,7 @@
     }
 
     // App version tag in settings (keep in sync with sw.js CACHE_NAME)
-    const APP_VERSION = 'v183';
+    const APP_VERSION = 'v184';
     const appVersionEl = document.getElementById('app-version');
     if (appVersionEl) appVersionEl.textContent = APP_VERSION;
 
@@ -2219,9 +2219,39 @@
         if (!breakdownEl) return;
         const stopEls = Array.from(breakdownEl.querySelectorAll('.breakdown-stop'));
         // stopEls[0] = Start, stopEls[k] = end of leg k-1 (arrives after legValues[k-1])
-        // "above" a stop at index k = sum of legValues[0..k-1]; "below" = sum of legValues[k..end]
         const totalDist = legValues.reduce((s, l) => s + l.dist, 0);
         const totalDur = legValues.reduce((s, l) => s + l.dur, 0);
+
+        // ---- Departure time + buffer controls (inserted once at the top) ----
+        const controls = document.createElement('div');
+        controls.className = 'breakdown-controls';
+        controls.innerHTML =
+            `<div class="bc-field">` +
+                `<label>Depart</label>` +
+                `<input type="time" class="depart-time-input" aria-label="Departure time">` +
+            `</div>` +
+            `<div class="bc-field">` +
+                `<label>Buffer (min)</label>` +
+                `<input type="number" class="buffer-input" min="0" step="1" value="7" aria-label="Buffer minutes per stop">` +
+            `</div>` +
+            `<div class="bc-hint">Set a departure time, then tap a stop to see your arrival.</div>`;
+        breakdownEl.insertBefore(controls, breakdownEl.firstChild);
+
+        const departInput = controls.querySelector('.depart-time-input');
+        const bufferInput = controls.querySelector('.buffer-input');
+        // Don't let taps on the controls collapse the breakdown
+        controls.addEventListener('click', (ev) => ev.stopPropagation());
+
+        // When depart/buffer change, refresh the currently-selected stop's arrival
+        // by toggling it off then on.
+        departInput.addEventListener('change', () => {
+            const sel = breakdownEl.querySelector('.breakdown-stop.breakdown-selected');
+            if (sel) { sel.click(); sel.click(); }
+        });
+        bufferInput.addEventListener('change', () => {
+            const sel = breakdownEl.querySelector('.breakdown-stop.breakdown-selected');
+            if (sel) { sel.click(); sel.click(); }
+        });
 
         stopEls.forEach((el, k) => {
             el.classList.add('breakdown-selectable');
@@ -2241,65 +2271,37 @@
                 const belowDist = totalDist - aboveDist;
                 const belowDur = totalDur - aboveDur;
 
-                // Buffer: 7 min of service time for each stop you visit before
-                // arriving here. Start (k=0) isn't a serviced stop, and the
-                // selected stop itself isn't counted (you're arriving at it).
-                const BUFFER_PER_STOP_SECS = 7 * 60;
+                // Buffer: N min of service time for each stop visited before arriving here.
+                // Start (k=0) isn't a serviced stop; the selected stop isn't counted.
+                const bufferMinPer = Math.max(0, parseInt(bufferInput.value, 10) || 0);
                 const stopsBefore = Math.max(0, k - 1);
-                const bufferSecs = stopsBefore * BUFFER_PER_STOP_SECS;
-                // Total lead time needed = drive time to here + buffers along the way.
-                const leadSecs = aboveDur + bufferSecs;
+                const bufferSecs = stopsBefore * bufferMinPer * 60;
+
+                // Arrival time = departure + drive time to here + buffers along the way.
+                let arrivalHtml = '';
+                const departVal = departInput.value; // "HH:MM"
+                if (departVal) {
+                    const [h, m] = departVal.split(':').map(Number);
+                    const depart = new Date();
+                    depart.setHours(h, m, 0, 0);
+                    const arrival = new Date(depart.getTime() + (aboveDur + bufferSecs) * 1000);
+                    const arrivalStr = arrival.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+                    const driveMin = Math.round(aboveDur / 60);
+                    const bufMin = Math.round(bufferSecs / 60);
+                    arrivalHtml =
+                        `<div class="split-arrival-result">Arrive <strong>${arrivalStr}</strong>` +
+                        `<span class="arrival-detail">${driveMin} min driving + ${bufMin} min buffer (${stopsBefore} stop${stopsBefore === 1 ? '' : 's'})</span></div>`;
+                } else {
+                    arrivalHtml = `<div class="split-arrival-result muted">Set a departure time above to see arrival.</div>`;
+                }
 
                 const split = document.createElement('div');
                 split.className = 'breakdown-split';
                 split.innerHTML =
                     `<div class="split-row"><span class="split-tag split-above">Above</span> ${formatDistanceMeters(aboveDist)} · ${formatDurationSecs(aboveDur)}</div>` +
                     `<div class="split-row"><span class="split-tag split-below">Below</span> ${formatDistanceMeters(belowDist)} · ${formatDurationSecs(belowDur)}</div>` +
-                    `<div class="split-arrival">` +
-                        `<button type="button" class="arrival-clock-btn" aria-label="Set arrival time">🕐 Arrive by…</button>` +
-                        `<div class="arrival-input-row hidden">` +
-                            `<input type="time" class="arrival-time-input" aria-label="Target arrival time">` +
-                        `</div>` +
-                        `<div class="arrival-result hidden"></div>` +
-                    `</div>`;
+                    arrivalHtml;
                 el.insertAdjacentElement('afterend', split);
-
-                // Clock interactions
-                const clockBtn = split.querySelector('.arrival-clock-btn');
-                const inputRow = split.querySelector('.arrival-input-row');
-                const timeInput = split.querySelector('.arrival-time-input');
-                const resultEl = split.querySelector('.arrival-result');
-
-                clockBtn.addEventListener('click', (ev) => {
-                    ev.stopPropagation();
-                    inputRow.classList.toggle('hidden');
-                    if (!inputRow.classList.contains('hidden')) timeInput.focus();
-                });
-
-                const computeStart = (ev) => {
-                    if (ev) ev.stopPropagation();
-                    const val = timeInput.value; // "HH:MM" 24h
-                    if (!val) {
-                        resultEl.textContent = 'Pick a time first.';
-                        resultEl.classList.remove('hidden');
-                        return;
-                    }
-                    const [h, m] = val.split(':').map(Number);
-                    const arrive = new Date();
-                    arrive.setHours(h, m, 0, 0);
-                    const start = new Date(arrive.getTime() - leadSecs * 1000);
-                    const startStr = start.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-                    const bufferMin = Math.round(bufferSecs / 60);
-                    const driveMin = Math.round(aboveDur / 60);
-                    resultEl.innerHTML =
-                        `Leave by <strong>${startStr}</strong>` +
-                        `<span class="arrival-detail">${driveMin} min driving + ${bufferMin} min buffer at ${stopsBefore} stop${stopsBefore === 1 ? '' : 's'}</span>`;
-                    resultEl.classList.remove('hidden');
-                };
-
-                timeInput.addEventListener('change', computeStart);
-                // Prevent taps inside the input row from bubbling to the stop toggle
-                inputRow.addEventListener('click', (ev) => ev.stopPropagation());
             });
         });
     }

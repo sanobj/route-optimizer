@@ -874,37 +874,32 @@ body {
     background: var(--danger);
 }
 
-/* Arrival-time clock inside the breakdown split */
-.split-arrival {
-    margin-top: 8px;
-    padding-top: 8px;
-    border-top: 1px dashed var(--border);
-}
-
-.arrival-clock-btn {
-    background: none;
-    border: 1px solid var(--border);
-    color: var(--text);
-    border-radius: 6px;
-    padding: 5px 10px;
-    font-size: 0.8rem;
-    font-weight: 600;
-    cursor: pointer;
-}
-
-.arrival-input-row {
+/* Departure time + buffer controls at the top of the breakdown */
+.breakdown-controls {
     display: flex;
-    gap: 6px;
-    align-items: center;
-    margin-top: 8px;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 12px;
+    padding: 10px 4px 12px;
+    margin-bottom: 8px;
+    border-bottom: 1px solid var(--border);
 }
 
-.arrival-input-row.hidden {
-    display: none;
+.bc-field {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
 }
 
-.arrival-time-input {
-    flex: 1;
+.bc-field label {
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: var(--text-secondary);
+}
+
+.bc-field input {
     padding: 6px 8px;
     border: 1px solid var(--border);
     border-radius: 6px;
@@ -914,25 +909,32 @@ body {
     font-family: inherit;
 }
 
-.arrival-calc-btn {
-    padding: 6px 12px;
-    border: none;
-    border-radius: 6px;
-    background: var(--primary);
-    color: #fff;
-    font-size: 0.85rem;
-    font-weight: 600;
-    cursor: pointer;
+.depart-time-input {
+    min-width: 120px;
 }
 
-.arrival-result {
+.buffer-input {
+    width: 70px;
+}
+
+.bc-hint {
+    flex-basis: 100%;
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+}
+
+/* Per-stop arrival result inside a split */
+.split-arrival-result {
     margin-top: 8px;
-    font-size: 0.85rem;
-    font-weight: 600;
+    padding-top: 8px;
+    border-top: 1px dashed var(--border);
+    font-size: 0.9rem;
+    font-weight: 700;
 }
 
-.arrival-result.hidden {
-    display: none;
+.split-arrival-result.muted {
+    font-weight: 400;
+    color: var(--text-secondary);
 }
 
 .arrival-detail {
