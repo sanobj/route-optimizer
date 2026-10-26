@@ -16,6 +16,8 @@ A Progressive Web App that optimizes multi-stop driving routes for the fastest/s
 - 📌 Pin stops to lock them in position — only unpinned stops get optimized
 - ☰ Drag to reorder stops manually (hold the handle on mobile)
 - 🔄 End mode options: No End, Round Trip, or custom End Address
+- 🚦 Traffic-aware drive times (best-guess traffic model) in the summary and breakdown
+- 💬 AI Route Assistant — ask about arrival/departure times and have it reorder, add, remove, or lock stops for you (optional, bring your own free Gemini key)
 - 📊 Collapsible route breakdown showing distance/time between each stop
 - 💾 Save and load routes with overwrite protection
 - 🕘 Auto-saved route history (optimizations and clears, expires after 3 days)
@@ -63,6 +65,18 @@ A Progressive Web App that optimizes multi-stop driving routes for the fastest/s
    - API restrictions: select the 4 APIs above
 
 > Google gives $200/month free credit — more than enough for personal use.
+
+> **Traffic times:** The app now requests traffic-aware durations (best-guess model) using the Directions API. These requests bill at Google's "Directions Advanced" rate but stay comfortably within the free monthly credit for personal use.
+
+### 1b. AI Assistant Key (Optional, Free)
+
+To use the 💬 Route Assistant:
+
+1. Open [Google AI Studio](https://aistudio.google.com/apikey) and sign in
+2. Click **Create API key** and copy it
+3. In the app, tap ⚙️ and paste it into the **AI Assistant Key (Gemini)** field
+
+The Gemini API has a free tier that's plenty for personal use. This key is separate from your Maps key and is stored only on your device. The assistant answers questions about your optimized route (using the real traffic-aware drive times) and can make changes — reorder, add, remove, or lock stops — when you ask.
 
 ### 2. Use the App
 

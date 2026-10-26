@@ -10,7 +10,7 @@
     <title>Route Optimizer</title>
     <link rel="manifest" href="manifest.json">
     <link rel="apple-touch-icon" href="icon-192.png">
-    <link rel="stylesheet" href="styles.css?v=186">
+    <link rel="stylesheet" href="styles.css?v=187">
 </head>
 <body>
     <div id="app">
@@ -18,6 +18,7 @@
         <header class="header">
             <h1>Route Optimizer</h1>
             <div class="header-actions">
+                <button id="ai-chat-btn" class="icon-btn hidden" aria-label="Route Assistant">💬</button>
                 <button id="help-btn" class="icon-btn" aria-label="Help"><span class="info-glyph">i</span></button>
                 <button id="saved-routes-btn" class="icon-btn" aria-label="Saved Routes">💾</button>
                 <button id="history-btn" class="icon-btn" aria-label="Route History">🕘</button>
@@ -141,6 +142,17 @@
                     </ul>
                     <p class="help-note">Google's Maps Platform includes a monthly free usage credit, so normal personal use is typically free. You'll need to add a billing account to activate the key.</p>
                 </div>
+                <label for="ai-key-input">AI Assistant Key (Gemini) <button type="button" class="info-btn" id="ai-key-info-btn">ⓘ</button></label>
+                <input type="password" id="ai-key-input" placeholder="Optional — enables Route Assistant">
+                <div id="ai-key-info" class="settings-info hidden">
+                    <p><strong>Optional.</strong> Add a free Google Gemini key to chat with the Route Assistant (ask about arrival/departure times and have it adjust your route).</p>
+                    <ul class="help-list">
+                        <li>Open <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Google AI Studio</a> and sign in.</li>
+                        <li>Click <strong>Create API key</strong> and copy it.</li>
+                        <li>Paste it into the field above. It's stored only on this device.</li>
+                    </ul>
+                    <p class="help-note">This is a separate key from the Maps key above. The Gemini API has a free tier that's plenty for personal use.</p>
+                </div>
                 <div class="settings-toggle">
                     <label for="dark-mode-toggle">Dark Mode</label>
                     <input type="checkbox" id="dark-mode-toggle">
@@ -223,8 +235,25 @@
             <button id="navigate-btn" class="btn btn-navigate">Open in Google Maps</button>
             <button id="save-route-btn" class="btn btn-save">💾 Save Route</button>
         </div>
+
+        <!-- AI Route Assistant Chat Panel -->
+        <div id="ai-chat-panel" class="ai-chat-panel hidden">
+            <div class="ai-chat-header">
+                <h2>💬 Route Assistant</h2>
+                <button id="ai-chat-close-btn" class="icon-btn" aria-label="Close assistant">✕</button>
+            </div>
+            <div id="ai-chat-messages" class="ai-chat-messages">
+                <div class="ai-msg ai-msg-bot">
+                    Hi! Ask me about your route — like "If I need to be at stop 3 by 2pm, when should I leave?" or tell me to reorder, add, remove, or lock stops and I'll update the route.
+                </div>
+            </div>
+            <form id="ai-chat-form" class="ai-chat-form">
+                <input type="text" id="ai-chat-input" class="ai-chat-input" placeholder="Ask about your route…" autocomplete="off">
+                <button type="submit" id="ai-chat-send" class="ai-chat-send" aria-label="Send">➤</button>
+            </form>
+        </div>
     </div>
 
-    <script src="app.js?v=186"></script>
+    <script src="app.js?v=187"></script>
 </body>
 </html>

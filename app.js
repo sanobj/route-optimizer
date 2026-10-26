@@ -7,6 +7,7 @@
     let map = null;
     let directionsRenderer = null;
     let apiKey = localStorage.getItem('googleMapsApiKey') || '';
+    let aiKey = localStorage.getItem('geminiApiKey') || '';
     let advancedUI = localStorage.getItem('advancedUI') === 'true';
     let darkMode = localStorage.getItem('darkMode') === 'true';
 
@@ -402,7 +403,7 @@
     }
 
     // App version tag in settings (keep in sync with sw.js CACHE_NAME)
-    const APP_VERSION = 'v186';
+    const APP_VERSION = 'v187';
     const appVersionEl = document.getElementById('app-version');
     if (appVersionEl) appVersionEl.textContent = APP_VERSION;
 
@@ -416,12 +417,25 @@
         });
     }
 
+    // AI (Gemini) key setup info toggle
+    const aiKeyInput = document.getElementById('ai-key-input');
+    const aiKeyInfoBtn = document.getElementById('ai-key-info-btn');
+    const aiKeyInfo = document.getElementById('ai-key-info');
+    if (aiKeyInfoBtn && aiKeyInfo) {
+        aiKeyInfoBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            aiKeyInfo.classList.toggle('hidden');
+        });
+    }
+
     function openSettings() {
         apiKeyInput.value = apiKey;
+        if (aiKeyInput) aiKeyInput.value = aiKey;
         document.getElementById('dark-mode-toggle').checked = darkMode;
         document.getElementById('advanced-ui-toggle').checked = advancedUI;
         if (advancedInfo) advancedInfo.classList.add('hidden');
         if (apiKeyInfo) apiKeyInfo.classList.add('hidden');
+        if (aiKeyInfo) aiKeyInfo.classList.add('hidden');
         settingsModal.classList.remove('hidden');
     }
 
@@ -437,6 +451,11 @@
         }
         apiKey = key;
         localStorage.setItem('googleMapsApiKey', apiKey);
+
+        // Save AI (Gemini) key — optional, may be blank
+        aiKey = aiKeyInput ? aiKeyInput.value.trim() : '';
+        localStorage.setItem('geminiApiKey', aiKey);
+        updateAiButtonVisibility();
 
         // Save dark mode setting
         darkMode = document.getElementById('dark-mode-toggle').checked;
@@ -1642,6 +1661,10 @@
                 waypoints: finalWaypoints.map(addr => ({ location: addr, stopover: true })),
                 optimizeWaypoints: false,
                 travelMode: google.maps.TravelMode.DRIVING,
+                drivingOptions: {
+                    departureTime: new Date(),
+                    trafficModel: 'bestguess',
+                },
             }, (result, status) => {
                 if (status === google.maps.DirectionsStatus.OK) {
                     try { displayRoute(result, origin, finalWaypoints); } catch(e) { console.error(e); }
@@ -1926,6 +1949,10 @@
                         waypoints: waypoints.map(addr => ({ location: addr, stopover: true })),
                         optimizeWaypoints: false, // order already optimal
                         travelMode: google.maps.TravelMode.DRIVING,
+                        drivingOptions: {
+                            departureTime: new Date(),
+                            trafficModel: 'bestguess',
+                        },
                     }, (res, status) => {
                         if (status === google.maps.DirectionsStatus.OK) resolve(res);
                         else { console.error('Batch', b + 1, 'failed:', status); resolve(null); }
@@ -1971,17 +1998,19 @@
             directionsRenderer.setDirections({ routes: [] });
         }
 
-        // Combine all legs from all batches
+        // Combine all legs from all batches (traffic-aware when available)
         let allLegs = [];
         let totalDistance = 0;
         let totalDuration = 0;
+        let anyTraffic = false;
 
         batchResults.forEach((batch, bIdx) => {
             const route = batch.result.routes[0];
             route.legs.forEach((leg, i) => {
                 allLegs.push({ leg, batchIdx: bIdx });
                 totalDistance += leg.distance.value;
-                totalDuration += leg.duration.value;
+                totalDuration += legDurationSecs(leg);
+                if (legHasTraffic(leg)) anyTraffic = true;
             });
         });
 
@@ -2103,16 +2132,17 @@
         const hours = Math.floor(totalDuration / 3600);
         const minutes = Math.round((totalDuration % 3600) / 60);
         const timeStr = hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
+        const timeLabel = anyTraffic ? 'Time (with traffic)' : 'Total Time';
 
-        // Breakdown
+        // Breakdown (traffic-aware when available)
         const batchedLegValues = [];
         let breakdownHtml = '<div class="route-breakdown hidden">';
         breakdownHtml += `<div class="breakdown-stop"><span class="breakdown-label breakdown-start">Start</span> ${firstLeg.start_address}</div>`;
         let legNum = 1;
         allLegs.forEach((item, i) => {
             const isLast = i === allLegs.length - 1;
-            batchedLegValues.push({ dist: item.leg.distance.value, dur: item.leg.duration.value });
-            breakdownHtml += `<div class="breakdown-arrow">↓ ${item.leg.distance.text} · ${item.leg.duration.text}</div>`;
+            batchedLegValues.push({ dist: item.leg.distance.value, dur: legDurationSecs(item.leg) });
+            breakdownHtml += `<div class="breakdown-arrow">↓ ${item.leg.distance.text} · ${legDurationText(item.leg)}${legHasTraffic(item.leg) ? ' 🚦' : ''}</div>`;
             const label = isLast ? 'End' : `${legNum}`;
             let cls = isLast ? 'breakdown-end' : '';
             // Box color = type (bus/res); number color = gold if rush. Advanced UI only.
@@ -2131,7 +2161,7 @@
             <div class="summary-stats">
                 <div class="stat">
                     <div class="stat-value">${timeStr}</div>
-                    <div class="stat-label">Total Time</div>
+                    <div class="stat-label">${timeLabel}</div>
                 </div>
                 <div class="stat">
                     <div class="stat-value">${distanceMiles} mi</div>
@@ -2185,6 +2215,9 @@
             waypoints: allLegs.slice(0, -1).map(item => item.leg.end_address),
         };
 
+        // Capture structured context for the AI assistant
+        setLastRouteContext(allLegs.map(item => item.leg), { totalDistance, totalDuration, anyTraffic });
+
         // Auto-save to history
         const filledStopsForHistory = stops.filter(s => s.address.trim().length > 0);
         saveToHistory({
@@ -2215,6 +2248,10 @@
             })),
             optimizeWaypoints: optimize,
             travelMode: google.maps.TravelMode.DRIVING,
+            drivingOptions: {
+                departureTime: new Date(),
+                trafficModel: 'bestguess',
+            },
         };
 
         directionsService.route(request, (result, status) => {
@@ -2249,6 +2286,30 @@
             },
         });
         window._routeMarkers.push({ marker, type: 'start' });
+    }
+
+    // ===== TRAFFIC-AWARE DURATION HELPERS =====
+    // When a Directions request includes drivingOptions.departureTime, each leg
+    // gains a `duration_in_traffic` field. Prefer it when present, otherwise fall
+    // back to the free-flow `duration`.
+    function legDurationSecs(leg) {
+        if (leg && leg.duration_in_traffic && typeof leg.duration_in_traffic.value === 'number') {
+            return leg.duration_in_traffic.value;
+        }
+        return leg && leg.duration ? leg.duration.value : 0;
+    }
+
+    // Human text for a leg's duration, preferring the traffic-aware value.
+    function legDurationText(leg) {
+        if (leg && leg.duration_in_traffic && leg.duration_in_traffic.text) {
+            return leg.duration_in_traffic.text;
+        }
+        return leg && leg.duration ? leg.duration.text : '';
+    }
+
+    // True if this leg carries a traffic-aware duration (so we can label it).
+    function legHasTraffic(leg) {
+        return !!(leg && leg.duration_in_traffic && typeof leg.duration_in_traffic.value === 'number');
     }
 
     // Format seconds into "1h 23m" / "23m" / "45s"
@@ -2738,28 +2799,31 @@
             window._routePolylines.push({ polyline, type: legType });
         });
 
-        // Calculate totals
+        // Calculate totals (traffic-aware when available)
         let totalDistance = 0;
         let totalDuration = 0;
+        let anyTraffic = false;
         legs.forEach(leg => {
             totalDistance += leg.distance.value;
-            totalDuration += leg.duration.value;
+            totalDuration += legDurationSecs(leg);
+            if (legHasTraffic(leg)) anyTraffic = true;
         });
 
         const distanceMiles = (totalDistance / 1609.34).toFixed(1);
         const hours = Math.floor(totalDuration / 3600);
         const minutes = Math.round((totalDuration % 3600) / 60);
         const timeStr = hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
+        const timeLabel = anyTraffic ? 'Time (with traffic)' : 'Total Time';
 
         // Build leg breakdown HTML
         const routeLegValues = [];
         let breakdownHtml = '<div class="route-breakdown hidden">';
         // Show first address (start)
         breakdownHtml += `<div class="breakdown-stop"><span class="breakdown-label breakdown-start">Start</span> ${legs[0].start_address}</div>`;
-        // Show each leg's distance/time then the next address
+        // Show each leg's distance/time then the next address (traffic-aware)
         legs.forEach((leg, i) => {
-            routeLegValues.push({ dist: leg.distance.value, dur: leg.duration.value });
-            breakdownHtml += `<div class="breakdown-arrow">↓ ${leg.distance.text} · ${leg.duration.text}</div>`;
+            routeLegValues.push({ dist: leg.distance.value, dur: legDurationSecs(leg) });
+            breakdownHtml += `<div class="breakdown-arrow">↓ ${leg.distance.text} · ${legDurationText(leg)}${legHasTraffic(leg) ? ' 🚦' : ''}</div>`;
             const isLast = i === legs.length - 1;
             const label = isLast ? 'End' : `${i + 1}`;
             let cls = isLast ? 'breakdown-end' : '';
@@ -2779,7 +2843,7 @@
             <div class="summary-stats">
                 <div class="stat">
                     <div class="stat-value">${timeStr}</div>
-                    <div class="stat-label">Total Time</div>
+                    <div class="stat-label">${timeLabel}</div>
                 </div>
                 <div class="stat">
                     <div class="stat-value">${distanceMiles} mi</div>
@@ -2814,6 +2878,9 @@
             destination: legs[legs.length - 1].end_address,
             waypoints: legs.slice(0, -1).map(leg => leg.end_address),
         };
+
+        // Capture structured context for the AI assistant
+        setLastRouteContext(legs, { totalDistance, totalDuration, anyTraffic });
 
         // Auto-save to route history
         const filledStopsForHistory = stops.filter(s => s.address.trim().length > 0);
@@ -3247,6 +3314,381 @@
             setHistory(history);
         }
     });
+
+    // =====================================================================
+    // AI ROUTE ASSISTANT (Gemini, user-supplied key)
+    // =====================================================================
+    // Holds a snapshot of the last rendered route so the assistant can reason
+    // about real drive times (traffic-aware) without re-querying the API.
+    let lastRouteContext = null;
+
+    function setLastRouteContext(legs, totals) {
+        if (!legs || legs.length === 0) { lastRouteContext = null; return; }
+        lastRouteContext = {
+            start: legs[0].start_address,
+            end: legs[legs.length - 1].end_address,
+            trafficAware: !!(totals && totals.anyTraffic),
+            totalDistanceMeters: totals ? totals.totalDistance : null,
+            totalDurationSecs: totals ? totals.totalDuration : null,
+            legs: legs.map((leg, i) => ({
+                from: leg.start_address,
+                to: leg.end_address,
+                distanceText: leg.distance ? leg.distance.text : '',
+                distanceMeters: leg.distance ? leg.distance.value : null,
+                durationSecs: legDurationSecs(leg),
+                durationText: legDurationText(leg),
+                withTraffic: legHasTraffic(leg),
+            })),
+        };
+    }
+
+    // ----- DOM wiring for chat -----
+    const aiChatBtn = document.getElementById('ai-chat-btn');
+    const aiChatPanel = document.getElementById('ai-chat-panel');
+    const aiChatCloseBtn = document.getElementById('ai-chat-close-btn');
+    const aiChatMessages = document.getElementById('ai-chat-messages');
+    const aiChatForm = document.getElementById('ai-chat-form');
+    const aiChatInput = document.getElementById('ai-chat-input');
+    const aiChatSend = document.getElementById('ai-chat-send');
+
+    // Running conversation history sent to Gemini (excludes the system preamble).
+    const aiHistory = [];
+
+    function updateAiButtonVisibility() {
+        if (!aiChatBtn) return;
+        if (aiKey) aiChatBtn.classList.remove('hidden');
+        else aiChatBtn.classList.add('hidden');
+    }
+    updateAiButtonVisibility();
+
+    if (aiChatBtn) {
+        aiChatBtn.addEventListener('click', () => {
+            if (!aiKey) { openSettings(); return; }
+            aiChatPanel.classList.remove('hidden');
+            setTimeout(() => aiChatInput.focus(), 100);
+        });
+    }
+    if (aiChatCloseBtn) {
+        aiChatCloseBtn.addEventListener('click', () => aiChatPanel.classList.add('hidden'));
+    }
+    if (aiChatForm) {
+        aiChatForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const text = aiChatInput.value.trim();
+            if (text) handleAiMessage(text);
+        });
+    }
+
+    function appendAiMessage(text, kind) {
+        const el = document.createElement('div');
+        el.className = 'ai-msg ai-msg-' + kind;
+        el.textContent = text;
+        aiChatMessages.appendChild(el);
+        aiChatMessages.scrollTop = aiChatMessages.scrollHeight;
+        return el;
+    }
+
+    // Build a compact, structured description of the current app state.
+    function buildRouteStateForAI() {
+        const filledStops = stops.filter(s => s.address.trim().length > 0);
+        const now = new Date();
+        return {
+            currentTime: now.toLocaleString(),
+            startLocation: startInput.value.trim() || null,
+            endMode: endMode, // 'none' | 'round-trip' | 'address'
+            endAddress: endMode === 'address' ? (endInput.value.trim() || null) : null,
+            stops: filledStops.map((s, i) => ({
+                index: i + 1,
+                address: s.address.trim(),
+                pinned: !!s.pinned,
+                type: s.type || 'none',
+                rush: !!s.rush,
+            })),
+            optimizedRoute: lastRouteContext,
+        };
+    }
+
+    const AI_SYSTEM_PROMPT = `You are the Route Assistant inside a multi-stop driving route optimizer app.
+You help the user understand and modify their route. You are given the current route state as JSON, including stops (in current order), the end mode, and — if the route has been optimized — the per-leg driving times (traffic-aware when "withTraffic" is true) in "optimizedRoute".
+
+You can answer questions using the leg durations provided. Examples:
+- Departure/arrival math: if the user must arrive at a stop by a certain time, sum the driving seconds of the legs leading to that stop (plus any buffer the user mentions) and subtract from the target time to tell them when to leave.
+- "Will I make it on time", "how long to stop N", "what's the total drive time", etc.
+
+You can also CHANGE the route by emitting actions. Only change things the user actually asked to change.
+
+ALWAYS reply with a single JSON object (no markdown, no code fences) of this exact shape:
+{
+  "reply": "<natural-language message to show the user>",
+  "actions": [ <zero or more action objects> ]
+}
+
+Supported action objects:
+- {"type":"reorder","order":[<1-based stop indices in the NEW order>]}  // must include every current stop index exactly once
+- {"type":"add","address":"<full address or place>","position":<1-based index or omit for end>}
+- {"type":"remove","index":<1-based stop index>}
+- {"type":"pin","index":<1-based stop index>,"pinned":true|false}
+- {"type":"setEnd","mode":"none"|"round-trip"|"address","address":"<required only when mode=address>"}
+- {"type":"reoptimize"}  // re-run the optimizer after changes
+
+Rules:
+- If the user only asks a question, return an empty "actions" array.
+- After add/remove/reorder/setEnd changes, usually include a final {"type":"reoptimize"} so the map and times refresh, unless the user says not to.
+- Times you compute should use the traffic-aware leg durations when available; say so if you used traffic estimates.
+- Be concise and friendly. Never invent drive times that aren't derivable from the data; if the route hasn't been optimized yet, ask the user to tap Optimize first.`;
+
+    async function handleAiMessage(text) {
+        if (!aiKey) { openSettings(); return; }
+        aiChatInput.value = '';
+        appendAiMessage(text, 'user');
+        aiHistory.push({ role: 'user', text });
+
+        aiChatSend.disabled = true;
+        const typingEl = appendAiMessage('Thinking…', 'typing');
+
+        try {
+            const state = buildRouteStateForAI();
+            const parsed = await callGemini(state);
+            typingEl.remove();
+
+            const reply = (parsed && parsed.reply) ? parsed.reply : "Sorry, I couldn't come up with a response.";
+            appendAiMessage(reply, 'bot');
+            aiHistory.push({ role: 'model', text: reply });
+
+            const actions = (parsed && Array.isArray(parsed.actions)) ? parsed.actions : [];
+            if (actions.length > 0) applyAiActions(actions);
+        } catch (err) {
+            typingEl.remove();
+            console.error('AI error:', err);
+            appendAiMessage(err && err.message ? err.message : 'Something went wrong talking to the assistant.', 'error');
+        } finally {
+            aiChatSend.disabled = false;
+            aiChatInput.focus();
+        }
+    }
+
+    // Call Gemini's generateContent REST endpoint with the user's key.
+    async function callGemini(routeState) {
+        const model = 'gemini-1.5-flash';
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(aiKey)}`;
+
+        // Build conversation: system preamble + current state + prior turns.
+        const contents = [];
+        contents.push({
+            role: 'user',
+            parts: [{ text: AI_SYSTEM_PROMPT + '\n\nCURRENT ROUTE STATE (JSON):\n' + JSON.stringify(routeState) }],
+        });
+        contents.push({
+            role: 'model',
+            parts: [{ text: '{"reply":"Got it — I have your current route. What would you like to know or change?","actions":[]}' }],
+        });
+        // Replay prior turns (skip the latest user msg already pushed — include it last).
+        aiHistory.forEach(m => {
+            contents.push({ role: m.role === 'model' ? 'model' : 'user', parts: [{ text: m.text }] });
+        });
+
+        const body = {
+            contents,
+            generationConfig: {
+                temperature: 0.2,
+                responseMimeType: 'application/json',
+            },
+        };
+
+        const res = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+        });
+
+        if (!res.ok) {
+            let detail = '';
+            try { const j = await res.json(); detail = j.error && j.error.message ? j.error.message : ''; } catch (e) {}
+            if (res.status === 400 || res.status === 403) {
+                throw new Error('AI request rejected. Check that your Gemini key is valid and the Generative Language API is enabled. ' + detail);
+            }
+            if (res.status === 429) {
+                throw new Error('AI rate limit reached. Wait a moment and try again.');
+            }
+            throw new Error('AI request failed (' + res.status + '). ' + detail);
+        }
+
+        const data = await res.json();
+        const textOut = data &&
+            data.candidates &&
+            data.candidates[0] &&
+            data.candidates[0].content &&
+            data.candidates[0].content.parts &&
+            data.candidates[0].content.parts[0] &&
+            data.candidates[0].content.parts[0].text;
+
+        if (!textOut) throw new Error('The assistant returned an empty response.');
+
+        return parseAiJson(textOut);
+    }
+
+    // Parse the model's JSON, tolerating accidental code fences or stray text.
+    function parseAiJson(raw) {
+        let s = String(raw).trim();
+        // Strip ```json ... ``` fences if present.
+        s = s.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+        try {
+            return JSON.parse(s);
+        } catch (e) {
+            // Last resort: grab the first {...} block.
+            const start = s.indexOf('{');
+            const end = s.lastIndexOf('}');
+            if (start !== -1 && end !== -1 && end > start) {
+                try { return JSON.parse(s.slice(start, end + 1)); } catch (e2) {}
+            }
+            // No valid JSON — treat the whole thing as a plain reply.
+            return { reply: s, actions: [] };
+        }
+    }
+
+    // Apply the actions the AI requested against the live app state.
+    function applyAiActions(actions) {
+        let changed = false;
+        let wantsReoptimize = false;
+
+        for (const action of actions) {
+            if (!action || typeof action.type !== 'string') continue;
+            try {
+                switch (action.type) {
+                    case 'reorder': changed = aiReorder(action.order) || changed; break;
+                    case 'add': changed = aiAddStop(action.address, action.position) || changed; break;
+                    case 'remove': changed = aiRemoveStop(action.index) || changed; break;
+                    case 'pin': changed = aiSetPin(action.index, action.pinned) || changed; break;
+                    case 'setEnd': changed = aiSetEnd(action.mode, action.address) || changed; break;
+                    case 'reoptimize': wantsReoptimize = true; break;
+                    default: break;
+                }
+            } catch (e) {
+                console.error('Failed to apply AI action', action, e);
+            }
+        }
+
+        if (changed) {
+            appendAiMessage('✓ Route updated', 'action');
+            renumberStops();
+            updateOptimizeButton();
+        }
+
+        if (wantsReoptimize) {
+            const canOptimize = startInput.value.trim() &&
+                stops.filter(s => s.address.trim().length > 0).length >= 1 && !optimizeBtn.disabled;
+            if (canOptimize) {
+                appendAiMessage('Re-optimizing…', 'action');
+                optimizeRoute();
+            }
+        }
+    }
+
+    // Rebuild the stops DOM from the current `stops` array (used after reorders).
+    function rebuildStopsDOM() {
+        const snapshot = stops.map(s => ({ ...s }));
+        stopsContainer.innerHTML = '';
+        stops = [];
+        snapshot.forEach(() => addStop()); // creates fresh rows with new ids
+        // Now fill addresses/state into the freshly created rows in order.
+        snapshot.forEach((s, i) => {
+            const target = stops[i];
+            if (!target) return;
+            target.address = s.address;
+            target.pinned = s.pinned;
+            target.type = s.type || 'none';
+            target.rush = !!s.rush;
+            const row = stopsContainer.querySelector(`[data-id="${target.id}"]`);
+            if (row) {
+                const input = row.querySelector('.stop-input');
+                if (input) input.value = s.address;
+                // Reflect pin state
+                const pinBtn = row.querySelector('.pin-btn');
+                if (s.pinned && pinBtn) {
+                    pinBtn.innerHTML = lockIcon(true);
+                    pinBtn.classList.add('locked');
+                    row.classList.add('pinned');
+                }
+                // Reflect type/rush styling (advanced UI)
+                const numEl = row.querySelector('.stop-number');
+                if (numEl) {
+                    if (s.type === 'bus') numEl.classList.add('stop-num-bus');
+                    else if (s.type === 'res') numEl.classList.add('stop-num-res');
+                    if (s.rush) numEl.classList.add('stop-num-rush');
+                }
+                if (s.type === 'bus') { row.classList.remove('row-default'); row.classList.add('row-bus'); }
+                else if (s.type === 'res') { row.classList.remove('row-default'); row.classList.add('row-res'); }
+                if (s.rush) row.classList.add('rush');
+            }
+        });
+        renumberStops();
+    }
+
+    function aiReorder(order) {
+        const filled = stops.filter(s => s.address.trim().length > 0);
+        if (!Array.isArray(order) || order.length !== filled.length) return false;
+        // Validate it's a permutation of 1..n.
+        const sorted = [...order].sort((a, b) => a - b);
+        for (let i = 0; i < sorted.length; i++) if (sorted[i] !== i + 1) return false;
+
+        const reordered = order.map(idx => filled[idx - 1]);
+        // Keep any empty stops at the end.
+        const empties = stops.filter(s => s.address.trim().length === 0);
+        stops = [...reordered, ...empties];
+        rebuildStopsDOM();
+        return true;
+    }
+
+    function aiAddStop(address, position) {
+        if (!address || !address.trim()) return false;
+        addStop(); // appends a new empty stop at end
+        const newStop = stops[stops.length - 1];
+        newStop.address = address.trim();
+        const row = stopsContainer.querySelector(`[data-id="${newStop.id}"]`);
+        if (row) { const input = row.querySelector('.stop-input'); if (input) input.value = address.trim(); }
+
+        // If a specific position was requested, move it there.
+        if (typeof position === 'number' && position >= 1 && position <= stops.length) {
+            const fromIdx = stops.length - 1;
+            const toIdx = position - 1;
+            const [moved] = stops.splice(fromIdx, 1);
+            stops.splice(toIdx, 0, moved);
+            rebuildStopsDOM();
+        }
+        return true;
+    }
+
+    function aiRemoveStop(index) {
+        const filled = stops.filter(s => s.address.trim().length > 0);
+        if (typeof index !== 'number' || index < 1 || index > filled.length) return false;
+        const target = filled[index - 1];
+        removeStop(target.id);
+        return true;
+    }
+
+    function aiSetPin(index, pinned) {
+        const filled = stops.filter(s => s.address.trim().length > 0);
+        if (typeof index !== 'number' || index < 1 || index > filled.length) return false;
+        const target = filled[index - 1];
+        const shouldPin = pinned !== false; // default to pin=true
+        if (!!target.pinned !== shouldPin) togglePin(target.id);
+        return true;
+    }
+
+    function aiSetEnd(mode, address) {
+        if (!['none', 'round-trip', 'address'].includes(mode)) return false;
+        endMode = mode;
+        endModeBtns.forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
+        if (mode === 'address') {
+            endInputRow.classList.remove('hidden');
+            if (address && address.trim()) endInput.value = address.trim();
+        } else {
+            endInputRow.classList.add('hidden');
+            if (mode !== 'address') endInput.value = '';
+        }
+        updateOptimizeButton();
+        return true;
+    }
 
     // Register Service Worker with automatic update handling.
     if ('serviceWorker' in navigator) {
