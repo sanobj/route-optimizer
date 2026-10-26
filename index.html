@@ -10,7 +10,7 @@
     <title>Route Optimizer</title>
     <link rel="manifest" href="manifest.json">
     <link rel="apple-touch-icon" href="icon-192.png">
-    <link rel="stylesheet" href="styles.css?v=193">
+    <link rel="stylesheet" href="styles.css?v=194">
 </head>
 <body>
     <div id="app">
@@ -161,6 +161,15 @@
                     <label for="advanced-ui-toggle">Advanced UI <button type="button" class="info-btn" id="advanced-info-btn">ⓘ</button></label>
                     <input type="checkbox" id="advanced-ui-toggle">
                 </div>
+                <div class="settings-toggle">
+                    <label for="priority-routing-toggle">Business-first priority <button type="button" class="info-btn" id="priority-info-btn">ⓘ</button></label>
+                    <input type="checkbox" id="priority-routing-toggle">
+                </div>
+                <div id="priority-info" class="settings-info hidden">
+                    <p>Controls how Business/Residence tags affect routing:</p>
+                    <p><strong>On (default):</strong> businesses are always visited before residences.</p>
+                    <p><strong>Off:</strong> tags are kept only for color and the map filter — the optimizer finds the single fastest path through all stops, ignoring the tags for ordering.</p>
+                </div>
                 <div id="advanced-info" class="settings-info hidden">
                     <p><strong>Advanced UI adds:</strong></p>
                     <p>• Bus/Res priority (swipe right on a stop to select)</p>
@@ -254,6 +263,6 @@
         </div>
     </div>
 
-    <script src="app.js?v=193"></script>
+    <script src="app.js?v=194"></script>
 </body>
 </html>

@@ -10,6 +10,9 @@
     let aiKey = localStorage.getItem('geminiApiKey') || '';
     let advancedUI = localStorage.getItem('advancedUI') === 'true';
     let darkMode = localStorage.getItem('darkMode') === 'true';
+    // When true (default), businesses route before residences. When false, tags are
+    // kept for color/organization but the optimizer finds the single best path.
+    let priorityRouting = localStorage.getItem('priorityRouting') !== 'false';
 
     // Apply theme immediately to prevent flash
     if (darkMode) document.documentElement.setAttribute('data-theme', 'dark');
@@ -402,8 +405,17 @@
         });
     }
 
+    const priorityInfoBtn = document.getElementById('priority-info-btn');
+    const priorityInfo = document.getElementById('priority-info');
+    if (priorityInfoBtn && priorityInfo) {
+        priorityInfoBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            priorityInfo.classList.toggle('hidden');
+        });
+    }
+
     // App version tag in settings (keep in sync with sw.js CACHE_NAME)
-    const APP_VERSION = 'v193';
+    const APP_VERSION = 'v194';
     const appVersionEl = document.getElementById('app-version');
     if (appVersionEl) appVersionEl.textContent = APP_VERSION;
 
@@ -433,7 +445,10 @@
         if (aiKeyInput) aiKeyInput.value = aiKey;
         document.getElementById('dark-mode-toggle').checked = darkMode;
         document.getElementById('advanced-ui-toggle').checked = advancedUI;
+        const prToggle = document.getElementById('priority-routing-toggle');
+        if (prToggle) prToggle.checked = priorityRouting;
         if (advancedInfo) advancedInfo.classList.add('hidden');
+        if (priorityInfo) priorityInfo.classList.add('hidden');
         if (apiKeyInfo) apiKeyInfo.classList.add('hidden');
         if (aiKeyInfo) aiKeyInfo.classList.add('hidden');
         settingsModal.classList.remove('hidden');
@@ -466,6 +481,13 @@
         advancedUI = document.getElementById('advanced-ui-toggle').checked;
         localStorage.setItem('advancedUI', advancedUI.toString());
         applyAdvancedUI();
+
+        // Save business-first priority setting
+        const prToggle = document.getElementById('priority-routing-toggle');
+        if (prToggle) {
+            priorityRouting = prToggle.checked;
+            localStorage.setItem('priorityRouting', priorityRouting.toString());
+        }
 
         closeSettings();
         loadGoogleMaps();
@@ -1095,25 +1117,35 @@
         // Separate pinned and unpinned stops
         const pinnedStops = filledStops.filter(s => s.pinned);
 
-        // Pre-sort: reorder unpinned stops so businesses come before residences
-        // Pinned stops stay in their exact positions
-        const sortedFilledStops = [];
-        const unpinnedBus = filledStops.filter(s => !s.pinned && s.type === 'bus');
-        const unpinnedRes = filledStops.filter(s => !s.pinned && s.type === 'res');
-        const unpinnedNone = filledStops.filter(s => !s.pinned && s.type === 'none');
-        const unpinnedSorted = [...unpinnedBus, ...unpinnedNone, ...unpinnedRes];
+        // "Effective type" for ORDERING. When priority routing is off, we treat
+        // every stop as untyped so the optimizer finds the single best path —
+        // the bus/res labels are kept only for color/filtering, not ordering.
+        const typeFor = (s) => (priorityRouting ? (s.type || 'none') : 'none');
 
-        let unpinnedIdx = 0;
-        for (let i = 0; i < filledStops.length; i++) {
-            if (filledStops[i].pinned) {
-                sortedFilledStops.push(filledStops[i]);
-            } else {
-                sortedFilledStops.push(unpinnedSorted[unpinnedIdx++]);
+        // Pre-sort: reorder unpinned stops so businesses come before residences.
+        // Pinned stops stay in their exact positions. Skipped when priority is off.
+        const unpinnedBus = filledStops.filter(s => !s.pinned && typeFor(s) === 'bus');
+        const unpinnedRes = filledStops.filter(s => !s.pinned && typeFor(s) === 'res');
+        const unpinnedNone = filledStops.filter(s => !s.pinned && typeFor(s) === 'none');
+
+        let stopsForOptimize;
+        if (!priorityRouting) {
+            // No priority: keep the user's current order as the starting point and
+            // let the optimizer reorder everything freely.
+            stopsForOptimize = filledStops.slice();
+        } else {
+            const sortedFilledStops = [];
+            const unpinnedSorted = [...unpinnedBus, ...unpinnedNone, ...unpinnedRes];
+            let unpinnedIdx = 0;
+            for (let i = 0; i < filledStops.length; i++) {
+                if (filledStops[i].pinned) {
+                    sortedFilledStops.push(filledStops[i]);
+                } else {
+                    sortedFilledStops.push(unpinnedSorted[unpinnedIdx++]);
+                }
             }
+            stopsForOptimize = sortedFilledStops;
         }
-
-        // Use sortedFilledStops for optimization
-        const stopsForOptimize = sortedFilledStops;
 
         // If more than 23 waypoints, use batched optimization
         const MAX_WAYPOINTS = 23;
@@ -1623,8 +1655,10 @@
     // while using real road distances for the best in-group order.
     async function runTrueOptimization(origin, destination, filledStops) {
         try {
-            const busStops = filledStops.filter(s => s.type === 'bus');
-            const otherStops = filledStops.filter(s => s.type !== 'bus');
+            // When priority routing is off, nothing is treated as a business, so all
+            // stops fall into one group and get a single globally-optimal ordering.
+            const busStops = priorityRouting ? filledStops.filter(s => s.type === 'bus') : [];
+            const otherStops = priorityRouting ? filledStops.filter(s => s.type !== 'bus') : filledStops.slice();
             const busAddresses = busStops.map(s => s.address.trim());
             const otherAddresses = otherStops.map(s => s.address.trim());
 
@@ -1745,9 +1779,10 @@
                 segStart = stop.address.trim();
                 currentType = null;
             } else {
-                // Check for type boundary (bus -> non-bus or non-bus -> bus)
+                // Check for type boundary (bus -> non-bus or non-bus -> bus).
+                // When priority routing is off, treat all as one group (no boundary).
                 const stopType = stop.type || 'none';
-                const effectiveType = stopType === 'bus' ? 'bus' : 'other';
+                const effectiveType = (priorityRouting && stopType === 'bus') ? 'bus' : 'other';
 
                 if (currentType !== null && effectiveType !== currentType && currentUnpinned.length > 0) {
                     // Type boundary — end the current segment
@@ -1858,10 +1893,13 @@
         const MAX_WAYPOINTS = 23;
 
         try {
-            // Step 1: Separate stops by pin status and type
+            // Step 1: Separate stops by pin status and type. When priority routing
+            // is off, no stop counts as a business, so they're ordered as one group.
             const pinnedStops = stopsForOptimize.filter(s => s.pinned);
-            const busStops = stopsForOptimize.filter(s => !s.pinned && s.type === 'bus');
-            const otherStops = stopsForOptimize.filter(s => !s.pinned && s.type !== 'bus');
+            const busStops = priorityRouting ? stopsForOptimize.filter(s => !s.pinned && s.type === 'bus') : [];
+            const otherStops = priorityRouting
+                ? stopsForOptimize.filter(s => !s.pinned && s.type !== 'bus')
+                : stopsForOptimize.filter(s => !s.pinned);
 
             const busAddresses = busStops.map(s => s.address.trim());
             const otherAddresses = otherStops.map(s => s.address.trim());
