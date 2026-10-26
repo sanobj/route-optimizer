@@ -403,7 +403,7 @@
     }
 
     // App version tag in settings (keep in sync with sw.js CACHE_NAME)
-    const APP_VERSION = 'v187';
+    const APP_VERSION = 'v188';
     const appVersionEl = document.getElementById('app-version');
     if (appVersionEl) appVersionEl.textContent = APP_VERSION;
 
@@ -2239,34 +2239,64 @@
     function runDirections(origin, destination, waypoints, optimize) {
         const directionsService = new google.maps.DirectionsService();
 
-        const request = {
-            origin: origin,
-            destination: destination,
-            waypoints: waypoints.map(addr => ({
-                location: addr,
-                stopover: true,
-            })),
-            optimizeWaypoints: optimize,
-            travelMode: google.maps.TravelMode.DRIVING,
-            drivingOptions: {
-                departureTime: new Date(),
-                trafficModel: 'bestguess',
-            },
-        };
-
-        directionsService.route(request, (result, status) => {
-            if (status === google.maps.DirectionsStatus.OK) {
-                try {
-                    displayRoute(result, origin, waypoints);
-                } catch (e) {
-                    console.error('displayRoute error:', e);
-                }
-            } else {
-                handleDirectionsError(status);
-            }
+        // Google's Directions service does NOT return duration_in_traffic when
+        // optimizeWaypoints is true. So when we need Google to optimize the order,
+        // we first request the optimal order WITHOUT traffic, then re-request once
+        // with the order fixed (optimizeWaypoints:false) + drivingOptions, which
+        // DOES return traffic-aware durations. When we're not optimizing, we can
+        // ask for traffic directly in a single request.
+        const finish = () => {
             optimizeBtn.innerHTML = 'Optimize Route';
             optimizeBtn.disabled = false;
             updateOptimizeButton();
+        };
+
+        // Helper: render a route in a FIXED order with traffic requested.
+        const renderWithTraffic = (orderedWaypoints) => {
+            directionsService.route({
+                origin: origin,
+                destination: destination,
+                waypoints: orderedWaypoints.map(addr => ({ location: addr, stopover: true })),
+                optimizeWaypoints: false,
+                travelMode: google.maps.TravelMode.DRIVING,
+                drivingOptions: { departureTime: new Date(), trafficModel: 'bestguess' },
+            }, (result, status) => {
+                if (status === google.maps.DirectionsStatus.OK) {
+                    try { displayRoute(result, origin, orderedWaypoints); }
+                    catch (e) { console.error('displayRoute error:', e); }
+                } else {
+                    handleDirectionsError(status);
+                }
+                finish();
+            });
+        };
+
+        if (!optimize) {
+            // No optimization needed — ask for traffic directly in one request.
+            renderWithTraffic(waypoints);
+            return;
+        }
+
+        // Step 1: get Google's optimal waypoint order (no traffic on this request).
+        directionsService.route({
+            origin: origin,
+            destination: destination,
+            waypoints: waypoints.map(addr => ({ location: addr, stopover: true })),
+            optimizeWaypoints: true,
+            travelMode: google.maps.TravelMode.DRIVING,
+        }, (result, status) => {
+            if (status !== google.maps.DirectionsStatus.OK) {
+                handleDirectionsError(status);
+                finish();
+                return;
+            }
+            // Step 2: reorder our waypoints to the optimal order, then re-request
+            // with the order fixed so we get duration_in_traffic.
+            const order = result.routes[0].waypoint_order;
+            const orderedWaypoints = (order && order.length === waypoints.length)
+                ? order.map(i => waypoints[i])
+                : waypoints;
+            renderWithTraffic(orderedWaypoints);
         });
     }
 
