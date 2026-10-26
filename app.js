@@ -403,7 +403,7 @@
     }
 
     // App version tag in settings (keep in sync with sw.js CACHE_NAME)
-    const APP_VERSION = 'v189';
+    const APP_VERSION = 'v190';
     const appVersionEl = document.getElementById('app-version');
     if (appVersionEl) appVersionEl.textContent = APP_VERSION;
 
@@ -3498,55 +3498,64 @@ Rules:
     }
 
     // Cache the resolved model name for this session so we only call ListModels once.
-    let _resolvedAiModel = null;
+    let _resolvedModelCandidates = null; // ordered list of model names to try
 
-    // Preferred models in priority order. Google retires older aliases over time
-    // (e.g. gemini-1.5-flash returns 404), so we probe the key's actual model list
-    // and pick the best available flash-class model, falling back to these.
+    // Preferred models in priority order. The "-latest" aliases are listed FIRST
+    // because Google retires versioned IDs over time, and some keys return a 404 on
+    // a specific version (e.g. gemini-2.5-flash) even though ListModels shows it —
+    // the alias keeps working in that case.
     const AI_MODEL_PREFERENCES = [
+        'gemini-flash-latest',
         'gemini-2.5-flash',
         'gemini-2.0-flash',
         'gemini-2.5-flash-lite',
-        'gemini-flash-latest',
+        'gemini-pro-latest',
     ];
 
-    // Ask the API which models THIS key can use with generateContent, then choose
-    // the first preferred flash model that's actually supported.
-    async function resolveAiModel() {
-        if (_resolvedAiModel) return _resolvedAiModel;
+    // Build an ORDERED list of candidate models to try, so a single bad/retired
+    // model name doesn't block the chat — callGemini falls through on a 404.
+    // We combine our preferences with whatever the key's ListModels reports.
+    async function resolveModelCandidates() {
+        if (_resolvedModelCandidates) return _resolvedModelCandidates;
 
+        let usable = [];
         try {
             const listUrl = `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(aiKey)}`;
             const res = await fetch(listUrl);
             if (res.ok) {
                 const data = await res.json();
-                const usable = (data.models || [])
+                usable = (data.models || [])
                     .filter(m => (m.supportedGenerationMethods || []).includes('generateContent'))
                     .map(m => (m.name || '').replace(/^models\//, ''));
-
-                // First, try our preference list.
-                for (const pref of AI_MODEL_PREFERENCES) {
-                    if (usable.includes(pref)) { _resolvedAiModel = pref; return _resolvedAiModel; }
-                }
-                // Otherwise, take any flash model the key supports.
-                const anyFlash = usable.find(n => n.includes('flash'));
-                if (anyFlash) { _resolvedAiModel = anyFlash; return _resolvedAiModel; }
-                // Last resort: any generateContent-capable model at all.
-                if (usable.length > 0) { _resolvedAiModel = usable[0]; return _resolvedAiModel; }
             }
         } catch (e) {
-            console.warn('ListModels failed, falling back to default model.', e);
+            console.warn('ListModels failed; will try preferred models directly.', e);
         }
 
-        // Network/listing failed — fall back to the current default and hope for the best.
-        _resolvedAiModel = AI_MODEL_PREFERENCES[0];
-        return _resolvedAiModel;
+        const candidates = [];
+        const add = (name) => { if (name && !candidates.includes(name)) candidates.push(name); };
+
+        // Step 1: preferred models that the key actually lists. If the list call
+        //         failed, try all preferred and let any 404s fall through.
+        for (const pref of AI_MODEL_PREFERENCES) {
+            if (usable.length === 0 || usable.includes(pref)) add(pref);
+        }
+        // Step 2: any other flash models the key lists.
+        usable.filter(n => n.includes('flash')).forEach(add);
+        // Step 3: any remaining generateContent-capable models.
+        usable.forEach(add);
+
+        // Absolute fallback so the array is never empty.
+        if (candidates.length === 0) AI_MODEL_PREFERENCES.forEach(add);
+
+        _resolvedModelCandidates = candidates;
+        return _resolvedModelCandidates;
     }
 
-    // Call Gemini's generateContent REST endpoint with the user's key.
+    // Call Gemini's generateContent REST endpoint, trying each candidate model in
+    // order and falling through to the next one on a 404 (model not found/retired).
     async function callGemini(routeState) {
-        const model = await resolveAiModel();
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(aiKey)}`;
+        const candidates = await resolveModelCandidates();
 
         // Build conversation: system preamble + current state + prior turns.
         const contents = [];
@@ -3558,7 +3567,6 @@ Rules:
             role: 'model',
             parts: [{ text: '{"reply":"Got it — I have your current route. What would you like to know or change?","actions":[]}' }],
         });
-        // Replay prior turns (skip the latest user msg already pushed — include it last).
         aiHistory.forEach(m => {
             contents.push({ role: m.role === 'model' ? 'model' : 'user', parts: [{ text: m.text }] });
         });
@@ -3571,41 +3579,57 @@ Rules:
             },
         };
 
-        const res = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body),
-        });
+        let lastErr = null;
+        for (let i = 0; i < candidates.length; i++) {
+            const model = candidates[i];
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(aiKey)}`;
 
-        if (!res.ok) {
+            let res;
+            try {
+                res = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body),
+                });
+            } catch (netErr) {
+                throw new Error('Network error reaching the AI service. Check your connection.');
+            }
+
+            if (res.ok) {
+                const data = await res.json();
+                const textOut = data &&
+                    data.candidates &&
+                    data.candidates[0] &&
+                    data.candidates[0].content &&
+                    data.candidates[0].content.parts &&
+                    data.candidates[0].content.parts[0] &&
+                    data.candidates[0].content.parts[0].text;
+                if (!textOut) throw new Error('The assistant returned an empty response.');
+                return parseAiJson(textOut);
+            }
+
+            // Not OK — read the error detail.
             let detail = '';
             try { const j = await res.json(); detail = j.error && j.error.message ? j.error.message : ''; } catch (e) {}
+
             if (res.status === 404) {
-                // Chosen model was rejected — clear cache so we re-resolve next time.
-                _resolvedAiModel = null;
-                throw new Error('AI model "' + model + '" was not available for your key. It may have been retired — try sending your message again. ' + detail);
+                // This model isn't usable for this key — try the next candidate.
+                lastErr = new Error('No usable Gemini model found for your key. ' + detail);
+                continue;
             }
-            if (res.status === 400 || res.status === 403) {
-                throw new Error('AI request rejected. Check that your Gemini key is valid and the Generative Language API is enabled. ' + detail);
+            if (res.status === 400 || res.status === 401 || res.status === 403) {
+                // Auth/permission problems won't be fixed by another model — stop now.
+                throw new Error('AI request rejected (' + res.status + '). Check that your Gemini key is valid and the Generative Language API is enabled for its project. ' + detail);
             }
             if (res.status === 429) {
                 throw new Error('AI rate limit reached. Wait a moment and try again.');
             }
-            throw new Error('AI request failed (' + res.status + '). ' + detail);
+            lastErr = new Error('AI request failed (' + res.status + '). ' + detail);
         }
 
-        const data = await res.json();
-        const textOut = data &&
-            data.candidates &&
-            data.candidates[0] &&
-            data.candidates[0].content &&
-            data.candidates[0].content.parts &&
-            data.candidates[0].content.parts[0] &&
-            data.candidates[0].content.parts[0].text;
-
-        if (!textOut) throw new Error('The assistant returned an empty response.');
-
-        return parseAiJson(textOut);
+        // Every candidate 404'd (or otherwise failed) — reset so we re-list next time.
+        _resolvedModelCandidates = null;
+        throw lastErr || new Error('No usable Gemini model was available for your key.');
     }
 
     // Parse the model's JSON, tolerating accidental code fences or stray text.
