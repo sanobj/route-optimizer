@@ -403,7 +403,7 @@
     }
 
     // App version tag in settings (keep in sync with sw.js CACHE_NAME)
-    const APP_VERSION = 'v190';
+    const APP_VERSION = 'v191';
     const appVersionEl = document.getElementById('app-version');
     if (appVersionEl) appVersionEl.textContent = APP_VERSION;
 
@@ -3504,12 +3504,17 @@ Rules:
     // because Google retires versioned IDs over time, and some keys return a 404 on
     // a specific version (e.g. gemini-2.5-flash) even though ListModels shows it —
     // the alias keeps working in that case.
+    // Lighter flash models are listed first: since Google's Dec 2025 quota
+    // changes, heavier models (and some -pro aliases) have a ZERO free-tier daily
+    // quota and return 429 immediately, while flash-lite / flash still have a
+    // usable free allowance. callGemini falls through 404s AND 429s, so a
+    // limit-0 model is skipped in favor of one that still works for free.
     const AI_MODEL_PREFERENCES = [
-        'gemini-flash-latest',
-        'gemini-2.5-flash',
-        'gemini-2.0-flash',
         'gemini-2.5-flash-lite',
-        'gemini-pro-latest',
+        'gemini-2.0-flash',
+        'gemini-2.0-flash-lite',
+        'gemini-2.5-flash',
+        'gemini-flash-latest',
     ];
 
     // Build an ORDERED list of candidate models to try, so a single bad/retired
@@ -3613,22 +3618,29 @@ Rules:
             try { const j = await res.json(); detail = j.error && j.error.message ? j.error.message : ''; } catch (e) {}
 
             if (res.status === 404) {
-                // This model isn't usable for this key — try the next candidate.
+                // Model not found/retired for this key — try the next candidate.
                 lastErr = new Error('No usable Gemini model found for your key. ' + detail);
+                continue;
+            }
+            if (res.status === 429) {
+                // Rate limited OR this model has a zero free-tier quota (Google set
+                // several models' free daily limit to 0). Either way, try the next
+                // candidate — a lighter flash model often still has free quota.
+                lastErr = new Error('rate-limit');
                 continue;
             }
             if (res.status === 400 || res.status === 401 || res.status === 403) {
                 // Auth/permission problems won't be fixed by another model — stop now.
                 throw new Error('AI request rejected (' + res.status + '). Check that your Gemini key is valid and the Generative Language API is enabled for its project. ' + detail);
             }
-            if (res.status === 429) {
-                throw new Error('AI rate limit reached. Wait a moment and try again.');
-            }
             lastErr = new Error('AI request failed (' + res.status + '). ' + detail);
         }
 
-        // Every candidate 404'd (or otherwise failed) — reset so we re-list next time.
+        // Every candidate failed — reset so we re-list next time.
         _resolvedModelCandidates = null;
+        if (lastErr && lastErr.message === 'rate-limit') {
+            throw new Error("Every available model hit its free-tier limit. Google now sets some models' free daily quota to 0, so this may not reset — to use the assistant reliably you may need to enable billing (pay-as-you-go) on the key's project. Flash models cost only fractions of a cent per message.");
+        }
         throw lastErr || new Error('No usable Gemini model was available for your key.');
     }
 

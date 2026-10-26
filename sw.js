@@ -1,10 +1,10 @@
 // Service Worker for Route Optimizer PWA
-const CACHE_NAME = 'route-optimizer-v190';
+const CACHE_NAME = 'route-optimizer-v191';
 const ASSETS_TO_CACHE = [
     './',
     './index.html',
-    './styles.css?v=190',
-    './app.js?v=190',
+    './styles.css?v=191',
+    './app.js?v=191',
     './manifest.json'
 ];
 
