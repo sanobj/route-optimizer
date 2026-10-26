@@ -403,7 +403,7 @@
     }
 
     // App version tag in settings (keep in sync with sw.js CACHE_NAME)
-    const APP_VERSION = 'v192';
+    const APP_VERSION = 'v193';
     const appVersionEl = document.getElementById('app-version');
     if (appVersionEl) appVersionEl.textContent = APP_VERSION;
 
@@ -3453,17 +3453,31 @@ ALWAYS reply with a single JSON object (no markdown, no code fences) of this exa
   "actions": [ <zero or more action objects> ]
 }
 
+Each stop also has attributes the user can set, and so can you:
+- "category": "bus" (business), "res" (residence), or "none". Businesses are always routed before residences.
+- "rush": true/false — marks a stop as urgent/high-priority (shown in gold).
+- "pinned": true/false — locks a stop in its current position; only unpinned stops get reordered.
+These are reflected in the route state's "stops" entries (type, rush, pinned).
+
 Supported action objects:
 - {"type":"reorder","order":[<1-based stop indices in the NEW order>]}  // must include every current stop index exactly once
 - {"type":"add","address":"<full address or place>","position":<1-based index or omit for end>}
 - {"type":"remove","index":<1-based stop index>}
 - {"type":"pin","index":<1-based stop index>,"pinned":true|false}
+- {"type":"setType","index":<1-based stop index>,"category":"bus"|"res"|"none"}  // business / residence / clear
+- {"type":"setRush","index":<1-based stop index>,"rush":true|false}
 - {"type":"setEnd","mode":"none"|"round-trip"|"address","address":"<required only when mode=address>"}
 - {"type":"reoptimize"}  // re-run the optimizer after changes
 
+Interpretation hints:
+- "make stop 2 a business/work/office" -> setType category "bus". "make it a home/house/residence" -> setType category "res". "clear the tag / make it normal" -> category "none".
+- "mark stop 3 as rush/urgent/priority" -> setRush rush true. "remove rush" -> setRush rush false.
+- "lock / pin stop 4" -> pin pinned true. "unlock / unpin" -> pin pinned false.
+- You can combine several actions in one response (e.g. tag two stops and reoptimize).
+
 Rules:
 - If the user only asks a question, return an empty "actions" array.
-- After add/remove/reorder/setEnd changes, usually include a final {"type":"reoptimize"} so the map and times refresh, unless the user says not to.
+- After changes that affect ordering or stops (add/remove/reorder/setEnd/setType), usually include a final {"type":"reoptimize"} so the map and times refresh, unless the user says not to. (pin/setRush alone don't require reoptimize unless the user wants the order recomputed.)
 - Times you compute should use the traffic-aware leg durations when available; say so if you used traffic estimates.
 - Be concise and friendly. Never invent drive times that aren't derivable from the data; if the route hasn't been optimized yet, ask the user to tap Optimize first.`;
 
@@ -3699,6 +3713,8 @@ Rules:
                     case 'add': changed = aiAddStop(action.address, action.position) || changed; break;
                     case 'remove': changed = aiRemoveStop(action.index) || changed; break;
                     case 'pin': changed = aiSetPin(action.index, action.pinned) || changed; break;
+                    case 'setType': changed = aiSetType(action.index, action.category) || changed; break;
+                    case 'setRush': changed = aiSetRush(action.index, action.rush) || changed; break;
                     case 'setEnd': changed = aiSetEnd(action.mode, action.address) || changed; break;
                     case 'reoptimize': wantsReoptimize = true; break;
                     default: break;
@@ -3827,6 +3843,67 @@ Rules:
             if (mode !== 'address') endInput.value = '';
         }
         updateOptimizeButton();
+        return true;
+    }
+
+    // Business/Residence tagging and Rush are Advanced-UI features. If the AI uses
+    // them while Advanced UI is off, turn it on so the change is actually visible.
+    function ensureAdvancedUI() {
+        if (advancedUI) return;
+        advancedUI = true;
+        localStorage.setItem('advancedUI', 'true');
+        const toggle = document.getElementById('advanced-ui-toggle');
+        if (toggle) toggle.checked = true;
+        applyAdvancedUI();
+    }
+
+    // Set a stop's category: 'bus' (business), 'res' (residence), or 'none'.
+    function aiSetType(index, category) {
+        const filled = stops.filter(s => s.address.trim().length > 0);
+        if (typeof index !== 'number' || index < 1 || index > filled.length) return false;
+
+        // Normalize common synonyms the model might emit.
+        let cat = String(category || '').toLowerCase().trim();
+        if (['business', 'bus', 'commercial', 'work', 'office'].includes(cat)) cat = 'bus';
+        else if (['residence', 'res', 'home', 'house', 'residential'].includes(cat)) cat = 'res';
+        else if (['none', 'default', 'clear', 'normal', ''].includes(cat)) cat = 'none';
+        else return false;
+
+        ensureAdvancedUI();
+        const target = filled[index - 1];
+        target.type = cat;
+
+        const row = stopsContainer.querySelector(`[data-id="${target.id}"]`);
+        if (row) {
+            const numEl = row.querySelector('.stop-number');
+            if (numEl) {
+                numEl.classList.remove('stop-num-bus', 'stop-num-res');
+                if (cat === 'bus') numEl.classList.add('stop-num-bus');
+                else if (cat === 'res') numEl.classList.add('stop-num-res');
+            }
+            row.classList.remove('row-default', 'row-bus', 'row-res');
+            if (cat === 'bus') row.classList.add('row-bus');
+            else if (cat === 'res') row.classList.add('row-res');
+            else row.classList.add('row-default');
+        }
+        return true;
+    }
+
+    // Toggle/set the rush (gold/urgent) flag on a stop.
+    function aiSetRush(index, rush) {
+        const filled = stops.filter(s => s.address.trim().length > 0);
+        if (typeof index !== 'number' || index < 1 || index > filled.length) return false;
+
+        ensureAdvancedUI();
+        const target = filled[index - 1];
+        target.rush = (rush !== false); // default to true
+
+        const row = stopsContainer.querySelector(`[data-id="${target.id}"]`);
+        if (row) {
+            row.classList.toggle('rush', target.rush);
+            const numEl = row.querySelector('.stop-number');
+            if (numEl) numEl.classList.toggle('stop-num-rush', target.rush);
+        }
         return true;
     }
 
