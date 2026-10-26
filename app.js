@@ -403,7 +403,7 @@
     }
 
     // App version tag in settings (keep in sync with sw.js CACHE_NAME)
-    const APP_VERSION = 'v191';
+    const APP_VERSION = 'v192';
     const appVersionEl = document.getElementById('app-version');
     if (appVersionEl) appVersionEl.textContent = APP_VERSION;
 
@@ -3523,6 +3523,18 @@ Rules:
     async function resolveModelCandidates() {
         if (_resolvedModelCandidates) return _resolvedModelCandidates;
 
+        // Models that support generateContent but are NOT general chat models.
+        // These must be excluded or we may pick e.g. a TTS model, which rejects
+        // multi-turn chat with a 400. Matched as substrings of the model name.
+        const EXCLUDE = ['tts', 'image', 'imagen', 'vision', 'embedding', 'embed',
+            'aqa', 'learnlm', 'gemma', 'audio', 'live', 'native-audio', 'thinking'];
+        const isChatModel = (name) => {
+            const n = name.toLowerCase();
+            if (EXCLUDE.some(bad => n.includes(bad))) return false;
+            // Must look like a Gemini text model.
+            return n.startsWith('gemini');
+        };
+
         let usable = [];
         try {
             const listUrl = `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(aiKey)}`;
@@ -3531,7 +3543,8 @@ Rules:
                 const data = await res.json();
                 usable = (data.models || [])
                     .filter(m => (m.supportedGenerationMethods || []).includes('generateContent'))
-                    .map(m => (m.name || '').replace(/^models\//, ''));
+                    .map(m => (m.name || '').replace(/^models\//, ''))
+                    .filter(isChatModel);
             }
         } catch (e) {
             console.warn('ListModels failed; will try preferred models directly.', e);
@@ -3545,9 +3558,9 @@ Rules:
         for (const pref of AI_MODEL_PREFERENCES) {
             if (usable.length === 0 || usable.includes(pref)) add(pref);
         }
-        // Step 2: any other flash models the key lists.
+        // Step 2: any other flash chat models the key lists.
         usable.filter(n => n.includes('flash')).forEach(add);
-        // Step 3: any remaining generateContent-capable models.
+        // Step 3: any remaining chat-capable models.
         usable.forEach(add);
 
         // Absolute fallback so the array is never empty.
@@ -3629,9 +3642,19 @@ Rules:
                 lastErr = new Error('rate-limit');
                 continue;
             }
-            if (res.status === 400 || res.status === 401 || res.status === 403) {
+            if (res.status === 401 || res.status === 403) {
                 // Auth/permission problems won't be fixed by another model — stop now.
                 throw new Error('AI request rejected (' + res.status + '). Check that your Gemini key is valid and the Generative Language API is enabled for its project. ' + detail);
+            }
+            if (res.status === 400) {
+                // A 400 is usually model-specific (e.g. a TTS/specialized model that
+                // doesn't support multi-turn chat) — try the next candidate. The
+                // exception is an invalid API key, which we surface immediately.
+                if (/api[_ ]?key|API_KEY_INVALID/i.test(detail)) {
+                    throw new Error('Your Gemini API key appears to be invalid. ' + detail);
+                }
+                lastErr = new Error('AI request rejected (400). ' + detail);
+                continue;
             }
             lastErr = new Error('AI request failed (' + res.status + '). ' + detail);
         }
